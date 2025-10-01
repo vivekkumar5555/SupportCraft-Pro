@@ -1,6 +1,7 @@
 import fs from "fs/promises";
+import { createReadStream } from "fs";
 import csv from "csv-parser";
-import pdfParse from "pdf-parse";
+import PDFParser from "pdf2json";
 
 /**
  * Parse file content based on file type
@@ -48,7 +49,7 @@ const parseTextFile = async (filePath) => {
 const parseCsvFile = async (filePath) => {
   return new Promise((resolve, reject) => {
     const results = [];
-    const stream = fs.createReadStream(filePath);
+    const stream = createReadStream(filePath);
 
     stream
       .pipe(csv())
@@ -131,18 +132,47 @@ Answer: ${answer}
  * @returns {Promise<string>} - Extracted text content
  */
 const parsePdfFile = async (filePath) => {
-  try {
-    const dataBuffer = await fs.readFile(filePath);
-    const data = await pdfParse(dataBuffer);
+  return new Promise((resolve, reject) => {
+    const pdfParser = new PDFParser();
 
-    if (!data.text || data.text.trim().length === 0) {
-      throw new Error("No text content found in PDF");
-    }
+    pdfParser.on("pdfParser_dataError", (errData) => {
+      reject(new Error(`Failed to parse PDF file: ${errData.parserError}`));
+    });
 
-    return data.text.trim();
-  } catch (error) {
-    throw new Error(`Failed to parse PDF file: ${error.message}`);
-  }
+    pdfParser.on("pdfParser_dataReady", (pdfData) => {
+      try {
+        // Extract text from parsed PDF data
+        let text = "";
+
+        if (pdfData.Pages) {
+          pdfData.Pages.forEach((page) => {
+            if (page.Texts) {
+              page.Texts.forEach((textItem) => {
+                if (textItem.R) {
+                  textItem.R.forEach((textRun) => {
+                    if (textRun.T) {
+                      text += decodeURIComponent(textRun.T) + " ";
+                    }
+                  });
+                }
+              });
+              text += "\n";
+            }
+          });
+        }
+
+        if (!text || text.trim().length === 0) {
+          reject(new Error("No text content found in PDF"));
+        } else {
+          resolve(text.trim());
+        }
+      } catch (error) {
+        reject(new Error(`Failed to extract text from PDF: ${error.message}`));
+      }
+    });
+
+    pdfParser.loadPDF(filePath);
+  });
 };
 
 /**

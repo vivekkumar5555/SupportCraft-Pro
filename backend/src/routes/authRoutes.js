@@ -6,6 +6,7 @@ import {
   updateProfile,
   changePassword,
 } from "../controllers/authController.js";
+import { authenticateToken } from "../middlewares/auth.js";
 
 const router = express.Router();
 
@@ -14,8 +15,8 @@ router.post("/register", register);
 router.post("/login", login);
 
 // Protected routes (require authentication)
-router.get("/profile", getProfile);
-router.put("/profile", updateProfile);
-router.put("/change-password", changePassword);
+router.get("/profile", authenticateToken, getProfile);
+router.put("/profile", authenticateToken, updateProfile);
+router.put("/change-password", authenticateToken, changePassword);
 
 export default router;

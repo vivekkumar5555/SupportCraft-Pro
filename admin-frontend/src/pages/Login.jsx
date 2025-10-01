@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useAuth } from "../hooks/useAuth";
+import { useAuth } from "../hooks/useAuth.jsx";
 import { Bot, Eye, EyeOff } from "lucide-react";
 import LoadingSpinner from "../components/LoadingSpinner";
 

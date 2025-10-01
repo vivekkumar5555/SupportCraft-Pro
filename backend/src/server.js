@@ -1,9 +1,12 @@
+// Load environment variables first, before any other imports
+import dotenv from "dotenv";
+dotenv.config();
+
 import express from "express";
 import { createServer } from "http";
 import { Server } from "socket.io";
 import cors from "cors";
 import helmet from "helmet";
-import dotenv from "dotenv";
 import mongoose from "mongoose";
 
 // Import routes
@@ -17,8 +20,6 @@ import { rateLimiter } from "./middlewares/rateLimiter.js";
 
 // Import socket handlers
 import { setupSocketHandlers } from "./services/socketService.js";
-
-dotenv.config();
 
 const app = express();
 const server = createServer(app);
