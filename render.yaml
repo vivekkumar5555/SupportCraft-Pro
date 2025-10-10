@@ -1,0 +1,48 @@
+services:
+  # Backend API Service
+  - type: web
+    name: supportcraft-pro-support-widget-backend
+    runtime: node
+    region: oregon
+    plan: free
+    buildCommand: cd backend && npm install
+    startCommand: cd backend && node src/server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: FRONTEND_URL
+        value: https://supportcraft-pro.onrender.com
+      - key: WIDGET_ORIGIN
+        value: "*"
+      - key: MONGO_URI
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+
+  # Admin Frontend Static Site
+  - type: web
+    name: supportcraft-pro
+    runtime: static
+    region: oregon
+    plan: free
+    buildCommand: cd admin-frontend && npm install && npm run build
+    staticPublishPath: ./admin-frontend/dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: NODE_ENV
+        value: production
+
+  # Widget Static Site
+  - type: web
+    name: supportcraft-pro-widget
+    runtime: static
+    region: oregon
+    plan: free
+    buildCommand: cd widget && npm install && npm run build
+    staticPublishPath: ./widget/dist
+
