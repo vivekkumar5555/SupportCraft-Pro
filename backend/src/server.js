@@ -39,11 +39,15 @@ const ensureUploadsDir = async () => {
 const app = express();
 const server = createServer(app);
 
+// Clean up URLs (remove trailing slashes if present)
+const widgetOrigin = process.env.WIDGET_ORIGIN === "*" 
+  ? true 
+  : process.env.WIDGET_ORIGIN?.replace(/\/$/, '');
+
 // Socket.io setup with CORS
 const io = new Server(server, {
   cors: {
-    origin:
-      process.env.WIDGET_ORIGIN === "*" ? true : process.env.WIDGET_ORIGIN,
+    origin: widgetOrigin,
     methods: ["GET", "POST"],
     credentials: true,
   },
@@ -51,9 +55,13 @@ const io = new Server(server, {
 
 // Middleware
 app.use(helmet());
+
+// Clean up FRONTEND_URL (remove trailing slash if present)
+const frontendUrl = process.env.FRONTEND_URL?.replace(/\/$/, '');
+
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL,
+    origin: frontendUrl,
     credentials: true,
   })
 );
