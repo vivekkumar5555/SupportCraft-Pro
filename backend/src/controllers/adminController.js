@@ -7,7 +7,12 @@ import Tenant from "../models/Tenant.js";
 import Document from "../models/Document.js";
 import Embedding from "../models/Embedding.js";
 import { parseFileContent } from "../utils/fileParser.js";
-import { generateEmbeddings } from "../services/embeddingService.js";
+// TEMPORARY: Using mock service for testing (no OpenAI required)
+// To use real OpenAI: change to "../services/embeddingService.js"
+import {
+  generateEmbeddings,
+  generateBatchEmbeddings,
+} from "../services/embeddingService.mock.js";
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
@@ -38,6 +43,59 @@ const upload = multer({
     }
   },
 });
+
+// Get upload status
+export const getUploadStatus = async (req, res) => {
+  try {
+    const { uploadId } = req.params;
+    const userId = req.userId;
+
+    const user = await User.findById(userId).populate("tenantId");
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const document = await Document.findOne({
+      _id: uploadId,
+      tenantId: user.tenantId._id,
+    });
+
+    if (!document) {
+      return res.status(404).json({ error: "Upload not found" });
+    }
+
+    const progress = document.getProcessingProgress();
+
+    res.json({
+      uploadId: document._id,
+      status: document.processingStatus,
+      progress,
+      message: getStatusMessage(document.processingStatus, progress),
+      chunkCount: document.chunkCount,
+      embeddingCount: document.embeddingCount,
+      error: document.processingError || null,
+    });
+  } catch (error) {
+    console.error("Get upload status error:", error);
+    res.status(500).json({ error: "Failed to get upload status" });
+  }
+};
+
+// Helper function to generate status messages
+const getStatusMessage = (status, progress) => {
+  switch (status) {
+    case "pending":
+      return "Upload received, waiting to process...";
+    case "processing":
+      return `Processing document... ${progress}% complete`;
+    case "completed":
+      return "Document indexed successfully";
+    case "failed":
+      return "Processing failed";
+    default:
+      return "Unknown status";
+  }
+};
 
 // Upload FAQ documents
 export const uploadDocuments = async (req, res) => {
@@ -72,10 +130,12 @@ export const uploadDocuments = async (req, res) => {
 
       for (const file of req.files) {
         try {
+          console.log(`UPLOAD_RECEIVED: ${file.originalname} (${tenant._id})`);
+
           // Parse file content
           const content = await parseFileContent(file.path, file.mimetype);
 
-          // Create document record
+          // Create document record with initial status
           const document = new Document({
             tenantId: tenant._id,
             filename: file.filename,
@@ -88,18 +148,23 @@ export const uploadDocuments = async (req, res) => {
 
           await document.save();
 
-          // Process document asynchronously
-          processDocumentAsync(document._id, tenant._id);
+          // Increment tenant document count
+          await tenant.incrementDocumentCount();
 
-          results.push({
-            id: document._id,
-            filename: file.originalname,
-            size: file.size,
-            status: "uploaded",
+          // Process document asynchronously in background
+          processDocumentAsync(document._id, tenant._id).catch((error) => {
+            console.error(
+              `Background processing error for ${document._id}:`,
+              error
+            );
           });
 
-          // Clean up uploaded file
-          await fs.unlink(file.path);
+          results.push({
+            uploadId: document._id.toString(),
+            filename: file.originalname,
+            size: file.size,
+            status: "received",
+          });
         } catch (error) {
           console.error(`Error processing file ${file.originalname}:`, error);
           results.push({
@@ -107,11 +172,22 @@ export const uploadDocuments = async (req, res) => {
             error: error.message,
             status: "failed",
           });
+        } finally {
+          // Clean up uploaded file in finally block to ensure it's always deleted
+          try {
+            await fs.unlink(file.path);
+          } catch (unlinkError) {
+            console.error(
+              `Error deleting temporary file ${file.path}:`,
+              unlinkError
+            );
+          }
         }
       }
 
-      res.json({
-        message: "Files uploaded successfully",
+      // Return 202 Accepted with uploadIds
+      res.status(202).json({
+        message: "Files received and queued for processing",
         results,
       });
     });
@@ -123,9 +199,16 @@ export const uploadDocuments = async (req, res) => {
 
 // Process document asynchronously (create embeddings)
 const processDocumentAsync = async (documentId, tenantId) => {
+  let document = null;
+
   try {
-    const document = await Document.findById(documentId);
-    if (!document) return;
+    console.log(`UPLOAD_PARSING: Starting processing for ${documentId}`);
+
+    document = await Document.findById(documentId);
+    if (!document) {
+      console.error(`Document not found: ${documentId}`);
+      return;
+    }
 
     // Update status to processing
     document.processingStatus = "processing";
@@ -133,49 +216,190 @@ const processDocumentAsync = async (documentId, tenantId) => {
 
     // Split content into chunks
     const chunks = splitTextIntoChunks(document.content, 800); // 800 tokens per chunk
+
+    if (chunks.length === 0) {
+      throw new Error("No content chunks generated from document");
+    }
+
     document.chunkCount = chunks.length;
     await document.save();
 
-    // Generate embeddings for each chunk
-    let processedChunks = 0;
-    for (let i = 0; i < chunks.length; i++) {
-      try {
-        const embedding = await generateEmbeddings(chunks[i]);
+    console.log(
+      `UPLOAD_PARSING: ${documentId} - Generated ${chunks.length} chunks`
+    );
 
-        const embeddingDoc = new Embedding({
+    // Process embeddings in batches for better performance
+    const BATCH_SIZE = 50;
+    let processedChunks = 0;
+
+    for (
+      let batchIndex = 0;
+      batchIndex < chunks.length;
+      batchIndex += BATCH_SIZE
+    ) {
+      const batchChunks = chunks.slice(batchIndex, batchIndex + BATCH_SIZE);
+
+      console.log(
+        `EMBEDDING_BATCH: ${documentId} - Processing batch ${
+          Math.floor(batchIndex / BATCH_SIZE) + 1
+        }/${Math.ceil(chunks.length / BATCH_SIZE)}`
+      );
+
+      try {
+        // Generate embeddings for batch with retry logic
+        const embeddings = await generateBatchEmbeddingsWithRetry(
+          batchChunks,
+          3
+        );
+
+        // Save embeddings to database
+        const embeddingDocs = embeddings.map((embedding, idx) => ({
           tenantId,
           documentId,
-          text: chunks[i],
+          text: batchChunks[idx],
           embedding: embedding,
           metadata: {
-            chunkIndex: i,
-            tokenCount: chunks[i].split(" ").length,
+            chunkIndex: batchIndex + idx,
+            tokenCount: batchChunks[idx].split(" ").length,
           },
-        });
+        }));
 
-        await embeddingDoc.save();
-        processedChunks++;
+        await Embedding.insertMany(embeddingDocs);
+        processedChunks += embeddings.length;
 
         // Update progress
         document.embeddingCount = processedChunks;
         await document.save();
+
+        console.log(
+          `EMBEDDING_BATCH: ${documentId} - Completed ${processedChunks}/${
+            chunks.length
+          } chunks (${Math.round((processedChunks / chunks.length) * 100)}%)`
+        );
       } catch (error) {
-        console.error(`Error creating embedding for chunk ${i}:`, error);
+        console.error(
+          `EMBEDDING_BATCH_ERROR: ${documentId} - Batch ${
+            Math.floor(batchIndex / BATCH_SIZE) + 1
+          } failed:`,
+          error.message
+        );
+
+        // Try processing individually as fallback
+        for (let i = 0; i < batchChunks.length; i++) {
+          try {
+            const embedding = await generateEmbeddingsWithRetry(
+              batchChunks[i],
+              3
+            );
+
+            const embeddingDoc = new Embedding({
+              tenantId,
+              documentId,
+              text: batchChunks[i],
+              embedding: embedding,
+              metadata: {
+                chunkIndex: batchIndex + i,
+                tokenCount: batchChunks[i].split(" ").length,
+              },
+            });
+
+            await embeddingDoc.save();
+            processedChunks++;
+
+            // Update progress
+            document.embeddingCount = processedChunks;
+            await document.save();
+          } catch (chunkError) {
+            console.error(
+              `EMBEDDING_ERROR: ${documentId} - Chunk ${
+                batchIndex + i
+              } failed:`,
+              chunkError.message
+            );
+          }
+        }
       }
+
+      // Small delay to avoid rate limits
+      if (batchIndex + BATCH_SIZE < chunks.length) {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+    }
+
+    // Check if we processed at least some chunks
+    if (processedChunks === 0) {
+      throw new Error("Failed to create any embeddings");
     }
 
     // Mark as completed
     document.processingStatus = "completed";
     await document.save();
+
+    console.log(
+      `UPLOAD_INDEXED: ${documentId} - Successfully indexed with ${processedChunks} embeddings`
+    );
   } catch (error) {
-    console.error("Process document error:", error);
-    const document = await Document.findById(documentId);
+    console.error(`UPLOAD_FAILED: ${documentId} - ${error.message}`, error);
+
     if (document) {
       document.processingStatus = "failed";
       document.processingError = error.message;
       await document.save();
     }
+
+    // Re-throw to be caught by the caller
+    throw error;
   }
+};
+
+// Helper function to generate embeddings with retry logic
+const generateEmbeddingsWithRetry = async (text, maxRetries = 3) => {
+  let lastError;
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await generateEmbeddings(text);
+    } catch (error) {
+      lastError = error;
+      console.error(
+        `Embedding attempt ${attempt}/${maxRetries} failed:`,
+        error.message
+      );
+
+      // Wait with exponential backoff before retry
+      if (attempt < maxRetries) {
+        const delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
+    }
+  }
+
+  throw lastError;
+};
+
+// Helper function to generate batch embeddings with retry logic
+const generateBatchEmbeddingsWithRetry = async (texts, maxRetries = 3) => {
+  let lastError;
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await generateBatchEmbeddings(texts);
+    } catch (error) {
+      lastError = error;
+      console.error(
+        `Batch embedding attempt ${attempt}/${maxRetries} failed:`,
+        error.message
+      );
+
+      // Wait with exponential backoff before retry
+      if (attempt < maxRetries) {
+        const delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
+    }
+  }
+
+  throw lastError;
 };
 
 // Split text into chunks
@@ -272,6 +496,12 @@ export const deleteDocument = async (req, res) => {
     document.isActive = false;
     await document.save();
 
+    // Decrement tenant document count
+    const tenant = await Tenant.findById(document.tenantId);
+    if (tenant) {
+      await tenant.decrementDocumentCount();
+    }
+
     // Delete associated embeddings
     await Embedding.updateMany(
       { documentId: document._id },
@@ -342,9 +572,11 @@ export const getAnalytics = async (req, res) => {
 
     const tenantId = user.tenantId._id;
 
+    console.log(`[ANALYTICS] Getting analytics for tenant: ${tenantId}`);
+
     // Get document statistics
     const documentStats = await Document.aggregate([
-      { $match: { tenantId, isActive: true } },
+      { $match: { tenantId: tenantId, isActive: true } },
       {
         $group: {
           _id: "$processingStatus",
@@ -353,30 +585,73 @@ export const getAnalytics = async (req, res) => {
       },
     ]);
 
+    console.log(`[ANALYTICS] Document stats:`, documentStats);
+
     // Get embedding statistics
     const embeddingCount = await Embedding.countDocuments({
-      tenantId,
+      tenantId: tenantId,
       isActive: true,
     });
 
+    console.log(`[ANALYTICS] Embedding count:`, embeddingCount);
+
     // Get recent activity
     const recentDocuments = await Document.find({
-      tenantId,
+      tenantId: tenantId,
       isActive: true,
     })
       .sort({ createdAt: -1 })
       .limit(5)
       .select("originalName processingStatus createdAt");
 
-    res.json({
+    const response = {
       analytics: {
         documents: documentStats,
         totalEmbeddings: embeddingCount,
         recentDocuments,
       },
-    });
+    };
+
+    console.log(`[ANALYTICS] Response:`, JSON.stringify(response, null, 2));
+    res.json(response);
   } catch (error) {
     console.error("Get analytics error:", error);
     res.status(500).json({ error: "Failed to get analytics" });
+  }
+};
+
+// Update subscription plan
+export const updateSubscriptionPlan = async (req, res) => {
+  try {
+    const userId = req.userId;
+    const user = await User.findById(userId).populate("tenantId");
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const tenant = user.tenantId;
+    const { plan } = req.body;
+
+    if (!plan || !["free", "pro", "enterprise"].includes(plan)) {
+      return res.status(400).json({
+        error: "Invalid plan. Must be 'free', 'pro', or 'enterprise'",
+      });
+    }
+
+    // Update the plan
+    await tenant.updatePlan(plan);
+
+    res.json({
+      message: "Subscription plan updated successfully",
+      plan: tenant.subscription.plan,
+      limits: {
+        maxDocuments: tenant.subscription.maxDocuments,
+        maxQueriesPerMonth: tenant.subscription.maxQueriesPerMonth,
+      },
+    });
+  } catch (error) {
+    console.error("Update subscription plan error:", error);
+    res.status(500).json({ error: "Failed to update subscription plan" });
   }
 };

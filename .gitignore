@@ -106,3 +106,4 @@ backend/uploads/
 # Temporary files
 tmp/
 temp/
+RENDER_DEPLOYMENT.md

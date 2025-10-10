@@ -4,7 +4,8 @@ import User from "../models/User.js";
 import Tenant from "../models/Tenant.js";
 import Document from "../models/Document.js";
 import Embedding from "../models/Embedding.js";
-import { generateEmbeddings } from "../services/embeddingService.js";
+// Use mock service for seeding (no OpenAI required)
+import { generateEmbeddings } from "../services/embeddingService.mock.js";
 
 dotenv.config();
 
@@ -16,8 +17,12 @@ const seedDatabase = async () => {
     console.log("Starting database seeding...");
 
     // Connect to MongoDB
-    await mongoose.connect(process.env.MONGO_URI);
-    console.log("Connected to MongoDB");
+    const mongoURI =
+      process.env.MONGODB_URI ||
+      process.env.MONGO_URI ||
+      "mongodb://localhost:27017/chatbot";
+    await mongoose.connect(mongoURI);
+    console.log("Connected to MongoDB:", mongoURI);
 
     // Clear existing data
     await User.deleteMany({});
@@ -281,8 +286,9 @@ const splitTextIntoChunks = (text, maxTokens) => {
 };
 
 // Run seeding if this file is executed directly
-if (import.meta.url === `file://${process.argv[1]}`) {
-  seedDatabase();
-}
+seedDatabase().catch((error) => {
+  console.error("Seed error:", error);
+  process.exit(1);
+});
 
 export default seedDatabase;

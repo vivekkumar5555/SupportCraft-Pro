@@ -66,10 +66,12 @@ export const adminAPI = {
         "Content-Type": "multipart/form-data",
       },
     }),
+  getUploadStatus: (uploadId) => api.get(`/admin/upload/status/${uploadId}`),
   getDocuments: (params) => api.get("/admin/documents", { params }),
   deleteDocument: (documentId) => api.delete(`/admin/documents/${documentId}`),
   updateSettings: (data) => api.put("/admin/settings", data),
   getAnalytics: () => api.get("/admin/analytics"),
+  updateSubscriptionPlan: (plan) => api.put("/admin/subscription", { plan }),
 };
 
 // Chat API

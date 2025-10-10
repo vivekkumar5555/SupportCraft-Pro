@@ -27,22 +27,40 @@ const ChatTest = () => {
       const response = await chatAPI.testQuery(userMessage);
       const botResponse = {
         type: "bot",
-        content: response.response,
-        confidence: response.confidence,
-        sources: response.sources,
-        isFallback: response.isFallback,
+        content:
+          response.data.response ||
+          response.data.message ||
+          "No response received",
+        confidence: response.data.confidence,
+        source: response.data.source,
+        messageType: response.data.messageType,
+        sources: response.data.sources,
+        isFallback: response.data.isFallback,
         timestamp: new Date().toISOString(),
       };
       setResponses([...newResponses, botResponse]);
     } catch (error) {
       console.error("Test chat error:", error);
+      let errorMessage =
+        "Sorry, I encountered an error processing your request.";
+
+      if (error.response?.status === 401) {
+        errorMessage =
+          "⚠️ Authentication error. Please logout and login again.";
+      } else if (error.response?.data?.error) {
+        errorMessage = `Error: ${error.response.data.error}`;
+      } else if (error.message) {
+        errorMessage = `Error: ${error.message}`;
+      }
+
       const errorResponse = {
         type: "bot",
-        content: "Sorry, I encountered an error processing your request.",
+        content: errorMessage,
         isError: true,
         timestamp: new Date().toISOString(),
       };
       setResponses([...newResponses, errorResponse]);
+      toast.error(errorMessage);
     } finally {
       setTesting(false);
     }
@@ -118,6 +136,22 @@ const ChatTest = () => {
 
                   {response.type === "bot" && !response.isError && (
                     <div className="mt-2 space-y-2">
+                      {/* Source indicator */}
+                      {response.source && (
+                        <div className="text-xs opacity-75">
+                          {response.source === "pdf" && (
+                            <span className="text-green-600">
+                              📄 From document
+                            </span>
+                          )}
+                          {response.source === "default" && (
+                            <span className="text-gray-600">
+                              💬 General response
+                            </span>
+                          )}
+                        </div>
+                      )}
+
                       {response.confidence && (
                         <div className="text-xs opacity-75">
                           Confidence: {Math.round(response.confidence * 100)}%
@@ -133,20 +167,35 @@ const ChatTest = () => {
                       {response.sources && response.sources.length > 0 && (
                         <div className="space-y-1">
                           <div className="text-xs font-medium opacity-75">
-                            Sources:
+                            Sources ({response.sources.length}):
                           </div>
                           {response.sources
-                            .slice(0, 2)
+                            .slice(0, 3)
                             .map((source, sourceIndex) => (
                               <div
                                 key={sourceIndex}
                                 className="text-xs opacity-75 bg-white bg-opacity-20 rounded px-2 py-1"
                               >
-                                {source.text.substring(0, 100)}...
-                                {source.similarity && (
-                                  <span className="ml-1">
-                                    ({Math.round(source.similarity * 100)}%)
-                                  </span>
+                                <div className="font-medium">
+                                  Source {sourceIndex + 1}
+                                  {source.similarity && (
+                                    <span className="ml-1 text-green-600">
+                                      ({Math.round(source.similarity * 100)}%
+                                      match)
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="mt-1">
+                                  {source.text.substring(0, 150)}...
+                                </div>
+                                {source.documentId && (
+                                  <div className="mt-1 text-xs opacity-60">
+                                    Document ID:{" "}
+                                    {source.documentId
+                                      .toString()
+                                      .substring(0, 8)}
+                                    ...
+                                  </div>
                                 )}
                               </div>
                             ))}

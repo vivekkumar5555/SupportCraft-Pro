@@ -250,7 +250,38 @@ Add this script tag to any website:
 
 ## 🚀 Deployment
 
-### Backend Deployment
+### Quick Deploy to Render (Recommended)
+
+Deploy all services to Render in 30 minutes! 🚀
+
+📘 **[Complete Render Deployment Guide](./RENDER_DEPLOYMENT.md)**  
+✅ **[Quick Deployment Checklist](./DEPLOYMENT_CHECKLIST.md)**
+
+**One-Click Deploy:**
+
+1. Fork this repository to your GitHub
+2. Sign up at [Render.com](https://render.com)
+3. Create new Blueprint → Connect repository
+4. Render will auto-detect `render.yaml`
+5. Add MongoDB URI and OpenAI API key
+6. Deploy! ✨
+
+**What you get:**
+
+- ✅ Backend API (Free/Starter tier)
+- ✅ Admin Dashboard (Free static site)
+- ✅ Chat Widget (Free static site)
+- ✅ Automatic HTTPS
+- ✅ Auto-deploy on git push
+- ✅ Built-in monitoring
+
+**Cost:** $0/month (Free tier) or $7/month (Starter)
+
+---
+
+### Manual Deployment
+
+#### Backend Deployment
 
 1. Set production environment variables
 2. Build and start the server:
@@ -261,7 +292,7 @@ npm run build
 npm start
 ```
 
-### Frontend Deployment
+#### Frontend Deployment
 
 1. Build the admin frontend:
 
@@ -272,7 +303,7 @@ npm run build
 
 2. Serve the `dist` folder with a web server
 
-### Widget Deployment
+#### Widget Deployment
 
 1. Build the widget:
 
@@ -284,7 +315,7 @@ npm run build
 2. Upload `build/` contents to your CDN
 3. Update the loader script URL in your embed code
 
-### Environment Variables (Production)
+#### Environment Variables (Production)
 
 ```env
 NODE_ENV=production

@@ -205,7 +205,8 @@ const Dashboard = () => {
                           {doc.originalName}
                         </p>
                         <p className="text-sm text-gray-500">
-                          {doc.fileSizeMB} MB • {doc.chunkCount} chunks
+                          {(doc.fileSize / (1024 * 1024)).toFixed(2)} MB •{" "}
+                          {doc.chunkCount} chunks
                         </p>
                       </div>
                     </div>

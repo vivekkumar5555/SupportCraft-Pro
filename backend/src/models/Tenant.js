@@ -74,6 +74,10 @@ const tenantSchema = new mongoose.Schema(
         type: Number,
         default: 10,
       },
+      currentDocuments: {
+        type: Number,
+        default: 0,
+      },
       maxQueriesPerMonth: {
         type: Number,
         default: 1000,
@@ -120,6 +124,43 @@ tenantSchema.methods.canMakeQuery = function () {
 // Method to increment query count
 tenantSchema.methods.incrementQueryCount = function () {
   this.subscription.currentQueries += 1;
+  return this.save();
+};
+
+// Method to increment document count
+tenantSchema.methods.incrementDocumentCount = function () {
+  this.subscription.currentDocuments += 1;
+  return this.save();
+};
+
+// Method to decrement document count
+tenantSchema.methods.decrementDocumentCount = function () {
+  if (this.subscription.currentDocuments > 0) {
+    this.subscription.currentDocuments -= 1;
+  }
+  return this.save();
+};
+
+// Method to update subscription plan
+tenantSchema.methods.updatePlan = function (plan) {
+  this.subscription.plan = plan;
+  
+  // Update limits based on plan
+  switch (plan) {
+    case "free":
+      this.subscription.maxDocuments = 10;
+      this.subscription.maxQueriesPerMonth = 1000;
+      break;
+    case "pro":
+      this.subscription.maxDocuments = 100;
+      this.subscription.maxQueriesPerMonth = 10000;
+      break;
+    case "enterprise":
+      this.subscription.maxDocuments = 1000;
+      this.subscription.maxQueriesPerMonth = 100000;
+      break;
+  }
+  
   return this.save();
 };
 

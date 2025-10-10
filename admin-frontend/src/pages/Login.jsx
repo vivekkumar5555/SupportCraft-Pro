@@ -277,14 +277,6 @@ const Login = () => {
               )}
             </button>
           </div>
-
-          {isLogin && (
-            <div className="text-center">
-              <p className="text-sm text-gray-600">
-                Demo credentials: admin@demo.com / admin123
-              </p>
-            </div>
-          )}
         </form>
       </div>
     </div>

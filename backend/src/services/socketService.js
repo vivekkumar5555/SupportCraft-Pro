@@ -82,9 +82,6 @@ export const setupSocketHandlers = (io) => {
         // Send response
         socket.emit("bot:message", {
           message: response.response,
-          confidence: response.confidence,
-          sources: response.sources,
-          isFallback: response.isFallback,
           timestamp: new Date().toISOString(),
           type: "response",
         });

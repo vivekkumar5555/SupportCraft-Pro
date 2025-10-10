@@ -8,6 +8,8 @@ import { Server } from "socket.io";
 import cors from "cors";
 import helmet from "helmet";
 import mongoose from "mongoose";
+import fs from "fs/promises";
+import path from "path";
 
 // Import routes
 import authRoutes from "./routes/authRoutes.js";
@@ -20,6 +22,19 @@ import { rateLimiter } from "./middlewares/rateLimiter.js";
 
 // Import socket handlers
 import { setupSocketHandlers } from "./services/socketService.js";
+
+// Ensure uploads directory exists
+const ensureUploadsDir = async () => {
+  try {
+    const uploadsDir = path.join(process.cwd(), "uploads");
+    await fs.access(uploadsDir);
+  } catch (error) {
+    // Directory doesn't exist, create it
+    const uploadsDir = path.join(process.cwd(), "uploads");
+    await fs.mkdir(uploadsDir, { recursive: true });
+    console.log("Created uploads directory");
+  }
+};
 
 const app = express();
 const server = createServer(app);
@@ -91,9 +106,17 @@ app.use("*", (req, res) => {
 
 const PORT = process.env.PORT || 5000;
 
-server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-  console.log(`Environment: ${process.env.NODE_ENV}`);
-});
+// Start server
+const startServer = async () => {
+  // Ensure uploads directory exists
+  await ensureUploadsDir();
+
+  server.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+    console.log(`Environment: ${process.env.NODE_ENV}`);
+  });
+};
+
+startServer();
 
 export { io };

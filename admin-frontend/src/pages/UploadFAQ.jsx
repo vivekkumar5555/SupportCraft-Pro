@@ -12,18 +12,23 @@ import {
 } from "lucide-react";
 import { adminAPI } from "../services/api";
 import LoadingSpinner from "../components/LoadingSpinner";
+import UploadProgress from "../components/UploadProgress";
 import toast from "react-hot-toast";
 
 const UploadFAQ = () => {
   const [dragActive, setDragActive] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [activeUploads, setActiveUploads] = useState([]);
   const fileInputRef = useRef(null);
   const queryClient = useQueryClient();
 
   // Fetch documents
   const { data: documents, isLoading } = useQuery(
     "documents",
-    () => adminAPI.getDocuments({ limit: 50 }),
+    async () => {
+      const response = await adminAPI.getDocuments({ limit: 50 });
+      return response.data;
+    },
     {
       refetchInterval: 5000, // Refetch every 5 seconds to show processing status
     }
@@ -65,6 +70,7 @@ const UploadFAQ = () => {
 
   const handleFiles = async (files) => {
     const formData = new FormData();
+    const validFiles = [];
 
     Array.from(files).forEach((file) => {
       // Validate file type
@@ -83,6 +89,7 @@ const UploadFAQ = () => {
       }
 
       formData.append("documents", file);
+      validFiles.push(file);
     });
 
     if (formData.getAll("documents").length === 0) {
@@ -91,9 +98,31 @@ const UploadFAQ = () => {
 
     setUploading(true);
     try {
-      await adminAPI.uploadDocuments(formData);
-      queryClient.invalidateQueries("documents");
-      toast.success("Documents uploaded successfully");
+      const response = await adminAPI.uploadDocuments(formData);
+
+      // Handle 202 response with upload IDs
+      if (response.data && response.data.results) {
+        const uploads = response.data.results
+          .filter((result) => result.status === "received" && result.uploadId)
+          .map((result) => ({
+            uploadId: result.uploadId,
+            filename: result.filename,
+          }));
+
+        setActiveUploads((prev) => [...prev, ...uploads]);
+
+        if (uploads.length > 0) {
+          // Success toast will be shown after processing completes
+          console.log(`${uploads.length} file(s) queued for processing`);
+        }
+
+        // Show errors for failed uploads
+        response.data.results
+          .filter((result) => result.status === "failed")
+          .forEach((result) => {
+            toast.error(`${result.filename}: ${result.error}`);
+          });
+      }
     } catch (error) {
       toast.error(error.response?.data?.error || "Failed to upload documents");
     } finally {
@@ -111,6 +140,31 @@ const UploadFAQ = () => {
     if (window.confirm("Are you sure you want to delete this document?")) {
       deleteDocumentMutation.mutate(documentId);
     }
+  };
+
+  const handleUploadComplete = (uploadId, data) => {
+    console.log(`Upload completed: ${uploadId}`, data);
+    // Remove from active uploads
+    setActiveUploads((prev) =>
+      prev.filter((upload) => upload.uploadId !== uploadId)
+    );
+    // Force immediate refresh of document list
+    queryClient.invalidateQueries("documents");
+    queryClient.refetchQueries("documents");
+    toast.success(
+      `✓ Document indexed: ${data.chunkCount} chunks, ${data.embeddingCount} embeddings`
+    );
+  };
+
+  const handleUploadError = (uploadId, error) => {
+    console.error(`Upload failed: ${uploadId}`, error);
+    // Remove from active uploads
+    setActiveUploads((prev) =>
+      prev.filter((upload) => upload.uploadId !== uploadId)
+    );
+    // Refresh document list to show failed status
+    queryClient.invalidateQueries("documents");
+    toast.error(`Upload failed: ${error}`);
   };
 
   const getStatusIcon = (status) => {
@@ -161,10 +215,10 @@ const UploadFAQ = () => {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
           Upload FAQ Documents
         </h1>
-        <p className="mt-1 text-sm text-gray-500">
+        <p className="mt-1 text-xs sm:text-sm text-gray-500">
           Upload your FAQ documents to train your chatbot. Supported formats:
           TXT, CSV, PDF
         </p>
@@ -214,19 +268,52 @@ const UploadFAQ = () => {
             <div className="mt-4 flex items-center justify-center">
               <LoadingSpinner size="sm" className="mr-2" />
               <span className="text-sm text-gray-600">
-                Uploading and processing documents...
+                Uploading documents...
               </span>
             </div>
           )}
         </div>
       </div>
 
+      {/* Active Uploads Progress */}
+      {activeUploads.length > 0 && (
+        <div className="card">
+          <div className="card-header">
+            <h3 className="text-lg font-medium text-gray-900">
+              Processing Uploads
+            </h3>
+          </div>
+          <div className="card-body">
+            <div className="space-y-3">
+              {activeUploads.map((upload) => (
+                <UploadProgress
+                  key={upload.uploadId}
+                  uploadId={upload.uploadId}
+                  filename={upload.filename}
+                  onComplete={handleUploadComplete}
+                  onError={handleUploadError}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Documents List */}
       <div className="card">
         <div className="card-header">
-          <h3 className="text-lg font-medium text-gray-900">
-            Uploaded Documents
-          </h3>
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-medium text-gray-900">
+              Uploaded Documents
+            </h3>
+            {documents?.documents?.length > 0 && (
+              <span className="text-sm text-gray-500">
+                {documents.documents.length} document(s)
+                {documents.pagination?.total > documents.documents.length &&
+                  ` of ${documents.pagination.total} total`}
+              </span>
+            )}
+          </div>
         </div>
         <div className="card-body">
           {isLoading ? (
@@ -238,47 +325,60 @@ const UploadFAQ = () => {
               {documents.documents.map((doc) => (
                 <div
                   key={doc._id}
-                  className="flex items-center justify-between p-4 border border-gray-200 rounded-lg"
+                  className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-4 border border-gray-200 rounded-lg gap-3"
                 >
-                  <div className="flex items-center space-x-4">
-                    {getStatusIcon(doc.processingStatus)}
-                    <div>
-                      <h4 className="text-sm font-medium text-gray-900">
+                  <div className="flex items-start sm:items-center space-x-3 flex-1 min-w-0">
+                    <div className="flex-shrink-0 mt-0.5 sm:mt-0">
+                      {getStatusIcon(doc.processingStatus)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="text-sm font-medium text-gray-900 truncate">
                         {doc.originalName}
                       </h4>
-                      <div className="flex items-center space-x-4 text-xs text-gray-500">
-                        <span>{formatFileSize(doc.fileSize)}</span>
-                        <span>{doc.chunkCount} chunks</span>
-                        <span>{doc.embeddingCount} embeddings</span>
-                        <span>Uploaded {formatDate(doc.createdAt)}</span>
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500 mt-1">
+                        <span className="whitespace-nowrap">
+                          {formatFileSize(doc.fileSize)}
+                        </span>
+                        <span className="whitespace-nowrap">
+                          {doc.chunkCount} chunks
+                        </span>
+                        <span className="whitespace-nowrap">
+                          {doc.embeddingCount} embeddings
+                        </span>
+                        <span className="hidden sm:inline whitespace-nowrap">
+                          Uploaded {formatDate(doc.createdAt)}
+                        </span>
                       </div>
                     </div>
                   </div>
 
-                  <div className="flex items-center space-x-3">
-                    <span
-                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
-                        doc.processingStatus
-                      )}`}
-                    >
-                      {doc.processingStatus}
-                    </span>
+                  <div className="flex items-center justify-between sm:justify-end space-x-3 flex-shrink-0">
+                    <div className="flex items-center space-x-2">
+                      <span
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
+                          doc.processingStatus
+                        )}`}
+                      >
+                        {doc.processingStatus}
+                      </span>
 
-                    {doc.processingStatus === "processing" && (
-                      <div className="text-xs text-gray-500">
-                        {doc.chunkCount > 0
-                          ? Math.round(
-                              (doc.embeddingCount / doc.chunkCount) * 100
-                            )
-                          : 0}
-                        %
-                      </div>
-                    )}
+                      {doc.processingStatus === "processing" && (
+                        <div className="text-xs text-gray-500 font-medium">
+                          {doc.chunkCount > 0
+                            ? Math.round(
+                                (doc.embeddingCount / doc.chunkCount) * 100
+                              )
+                            : 0}
+                          %
+                        </div>
+                      )}
+                    </div>
 
                     <button
                       onClick={() => handleDelete(doc._id)}
-                      className="text-red-600 hover:text-red-800 transition-colors"
+                      className="text-red-600 hover:text-red-800 transition-colors p-1"
                       disabled={deleteDocumentMutation.isLoading}
+                      aria-label="Delete document"
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
@@ -303,10 +403,12 @@ const UploadFAQ = () => {
       {/* Tips */}
       <div className="card">
         <div className="card-header">
-          <h3 className="text-lg font-medium text-gray-900">Upload Tips</h3>
+          <h3 className="text-base sm:text-lg font-medium text-gray-900">
+            Upload Tips
+          </h3>
         </div>
         <div className="card-body">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <div>
               <h4 className="text-sm font-medium text-gray-900">
                 Supported Formats

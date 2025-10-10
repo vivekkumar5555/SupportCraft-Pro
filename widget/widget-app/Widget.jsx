@@ -40,6 +40,8 @@ const Widget = ({ config }) => {
           content: data.message,
           timestamp: data.timestamp,
           confidence: data.confidence,
+          source: data.source,
+          messageType: data.messageType,
           sources: data.sources,
           isFallback: data.isFallback,
         },
@@ -295,19 +297,6 @@ const Widget = ({ config }) => {
                   }
                 >
                   {message.content}
-                  {message.type === "bot" &&
-                    !message.isError &&
-                    message.confidence && (
-                      <div
-                        style={{
-                          fontSize: "11px",
-                          opacity: 0.7,
-                          marginTop: "4px",
-                        }}
-                      >
-                        Confidence: {Math.round(message.confidence * 100)}%
-                      </div>
-                    )}
                 </div>
               ))
             )}
