@@ -21,18 +21,14 @@ services:
       - key: OPENAI_API_KEY
         sync: false
 
-  # Admin Frontend Static Site
+  # Admin Frontend Web Service with SPA Support
   - type: web
     name: supportcraft-pro
-    runtime: static
+    runtime: node
     region: oregon
     plan: free
     buildCommand: cd admin-frontend && npm install && npm run build
-    staticPublishPath: ./admin-frontend/dist
-    routes:
-      - type: rewrite
-        source: /*
-        destination: /index.html
+    startCommand: cd admin-frontend && npm start
     envVars:
       - key: NODE_ENV
         value: production
