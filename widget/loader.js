@@ -10,9 +10,9 @@
 
   // Configuration
   const CONFIG = {
-    apiUrl: "http://localhost:5000/api",
-    wsUrl: "http://localhost:5000",
-    widgetUrl: "http://localhost:8080/widget.js",
+    apiUrl: "https://supportcraft-pro-support-widget-backend.onrender.com/api",
+    wsUrl: "https://supportcraft-pro-support-widget-backend.onrender.com",
+    widgetUrl: "https://supportcraft-pro-widget.onrender.com/widget.js",
     version: "1.0.0",
   };
 

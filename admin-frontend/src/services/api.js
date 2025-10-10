@@ -1,9 +1,10 @@
 import axios from "axios";
 import toast from "react-hot-toast";
+import { ENV } from "../config";
 
 // Create axios instance
 const api = axios.create({
-  baseURL: "/api",
+  baseURL: ENV.API_URL,
   timeout: 30000,
   headers: {
     "Content-Type": "application/json",
