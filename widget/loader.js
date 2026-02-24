@@ -10,9 +10,9 @@
 
   // Configuration
   const CONFIG = {
-    apiUrl: "https://supportcraft-pro-support-widget-backend.onrender.com/api",
-    wsUrl: "https://supportcraft-pro-support-widget-backend.onrender.com",
-    widgetUrl: "https://supportcraft-pro-widget.onrender.com/widget.js",
+    apiUrl: "http://localhost:5000/api",
+    wsUrl: "http://localhost:5000",
+    widgetUrl: "http://localhost:8080/build/widget.js",
     version: "1.0.0",
   };
 
@@ -23,7 +23,7 @@
 
   if (!widgetKey) {
     console.error(
-      "Support Widget: Widget key is required. Add data-widget-key attribute to the script tag."
+      "Support Widget: Widget key is required. Add data-widget-key attribute to the script tag.",
     );
     return;
   }
@@ -90,50 +90,46 @@
   // Load widget script
   function loadWidgetScript() {
     return new Promise((resolve, reject) => {
-      // Check if React is already loaded
-      if (window.React && window.ReactDOM) {
-        loadWidget();
-        resolve();
-        return;
-      }
-
-      // Load React
-      const reactScript = document.createElement("script");
-      reactScript.src =
-        "https://unpkg.com/react@18/umd/react.production.min.js";
-      reactScript.onload = () => {
-        const reactDOMScript = document.createElement("script");
-        reactDOMScript.src =
-          "https://unpkg.com/react-dom@18/umd/react-dom.production.min.js";
-        reactDOMScript.onload = () => {
-          loadWidget();
-          resolve();
-        };
-        reactDOMScript.onerror = reject;
-        document.head.appendChild(reactDOMScript);
+      const widgetScript = document.createElement("script");
+      widgetScript.src = CONFIG.widgetUrl;
+      widgetScript.onload = () => {
+        // Give the script time to execute and set up the global
+        setTimeout(() => {
+          if (
+            window.SupportWidget &&
+            typeof window.SupportWidget.init === "function"
+          ) {
+            console.log("Support Widget: Initializing widget");
+            window.SupportWidget.init({
+              ...widgetConfig,
+              apiUrl: CONFIG.apiUrl,
+              wsUrl: CONFIG.wsUrl,
+            });
+            resolve();
+          } else if (window.SupportWidget?.default?.init) {
+            // Fallback if it's wrapped in default
+            console.log("Support Widget: Found init in default export");
+            window.SupportWidget.default.init({
+              ...widgetConfig,
+              apiUrl: CONFIG.apiUrl,
+              wsUrl: CONFIG.wsUrl,
+            });
+            resolve();
+          } else {
+            console.error(
+              "Support Widget: Widget script loaded but init function not found",
+              window.SupportWidget,
+            );
+            reject(new Error("Widget init function not available"));
+          }
+        }, 100);
       };
-      reactScript.onerror = reject;
-      document.head.appendChild(reactScript);
+      widgetScript.onerror = () => {
+        console.error("Support Widget: Failed to load widget script");
+        reject(new Error("Failed to load widget script"));
+      };
+      document.head.appendChild(widgetScript);
     });
-  }
-
-  // Load widget
-  function loadWidget() {
-    const widgetScript = document.createElement("script");
-    widgetScript.src = CONFIG.widgetUrl;
-    widgetScript.onload = () => {
-      if (window.SupportWidget) {
-        window.SupportWidget.init({
-          ...widgetConfig,
-          apiUrl: CONFIG.apiUrl,
-          wsUrl: CONFIG.wsUrl,
-        });
-      }
-    };
-    widgetScript.onerror = () => {
-      console.error("Support Widget: Failed to load widget script");
-    };
-    document.head.appendChild(widgetScript);
   }
 
   // Initialize widget

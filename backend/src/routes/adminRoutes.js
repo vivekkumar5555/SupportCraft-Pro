@@ -26,4 +26,6 @@ router.get("/analytics", getAnalytics);
 // Subscription routes
 router.put("/subscription", updateSubscriptionPlan);
 
+
+
 export default router;

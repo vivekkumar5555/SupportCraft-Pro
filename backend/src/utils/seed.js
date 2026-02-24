@@ -32,9 +32,13 @@ const seedDatabase = async () => {
     console.log("Cleared existing data");
 
     // Create sample tenant
+    // allow overriding widgetKey for consistent testing
+    const seedWidgetKey = process.env.WIDGET_KEY || undefined;
     const tenant = new Tenant({
       name: "Demo Company",
       domain: "demo.com",
+      // if seedWidgetKey is undefined, mongoose will generate a uuid automatically
+      ...(seedWidgetKey ? { widgetKey: seedWidgetKey } : {}),
       brandSettings: {
         primaryColor: "#3B82F6",
         secondaryColor: "#1E40AF",
@@ -186,6 +190,38 @@ const seedDatabase = async () => {
         
         For API support, contact api@demo.com.`,
       },
+      {
+        title: "Computer Specification - Frequently Asked Questions (FAQ)",
+        content: `1. What is a processor (CPU)?
+The CPU (Central Processing Unit) is the brain of the computer. It performs calculations and executes instructions from programs. Modern CPUs have multiple cores which allow them to process multiple tasks simultaneously.
+
+2. What is RAM and how much do I need?
+RAM (Random Access Memory) is temporary memory used to store data that the CPU is actively working on. For casual use, 8GB is sufficient. For gaming or professional work, 16GB or more is recommended.
+
+3. What is the difference between SSD and HDD?
+SSD (Solid State Drive) uses flash memory and has no moving parts, making it faster and more reliable. HDD (Hard Disk Drive) uses spinning magnetic platters which makes it slower but cheaper. SSDs are recommended for most users today due to their superior performance.
+
+4. What is a graphics card (GPU)?
+A GPU (Graphics Processing Unit) is a specialized processor designed for rendering graphics and handling parallel computations. Dedicated GPUs are essential for gaming and video editing, while integrated graphics are sufficient for everyday tasks.
+
+5. What is the motherboard?
+The motherboard is the main circuit board that connects all components of a computer. It allows the CPU, RAM, graphics card, and other components to communicate with each other.
+
+6. What is the power supply unit (PSU)?
+The PSU converts AC power from your wall outlet to DC power that the computer needs. A good quality PSU is important for stability and longevity of the system.
+
+7. What is case airflow?
+Case airflow refers to how air circulates inside the computer case to cool components. Proper airflow prevents overheating and hardware failure. Most cases have intake fans in front and exhaust fans in the back.
+
+8. What are the benefits of an SSD over HDD?
+SSDs offer faster boot times, quicker application loading, better performance in video editing, and improved overall responsiveness. They are also more durable since there are no moving parts.
+
+9. What storage capacity should I choose?
+For basic computing, 256GB is sufficient. For gaming or content creation, 512GB to 1TB is recommended. Professional users may need multiple terabytes of storage.
+
+10. What is thermal paste and why is it important?
+Thermal paste is a compound applied between the CPU and its cooler to improve heat transfer. Good thermal contact prevents CPU overheating and ensures stable performance.`,
+      },
     ];
 
     // Create documents and embeddings
@@ -211,13 +247,15 @@ const seedDatabase = async () => {
 
       await document.save();
 
+      console.log(`Document ${document._id} content length: ${document.content.length}`);
+
       // Split content into chunks
       const chunks = splitTextIntoChunks(document.content, 400);
       document.chunkCount = chunks.length;
       document.embeddingCount = chunks.length;
       await document.save();
 
-      // Create embeddings for each chunk
+      // Ensure embeddings are generated for all chunks
       for (let j = 0; j < chunks.length; j++) {
         try {
           const embedding = await generateEmbeddings(chunks[j]);
@@ -235,6 +273,7 @@ const seedDatabase = async () => {
           });
 
           await embeddingDoc.save();
+          console.log(`Saved embedding for chunk ${j} of document ${document._id}`);
         } catch (error) {
           console.error(`Error creating embedding for chunk ${j}:`, error);
         }
@@ -265,21 +304,28 @@ const seedDatabase = async () => {
  * @returns {Array<string>} - Array of text chunks
  */
 const splitTextIntoChunks = (text, maxTokens) => {
-  const words = text.split(/\s+/);
+  // Split text into tokens including whitespace so we can preserve newline characters.
+  const tokens = text.split(/(\s+)/); // captures spaces and newlines as separate tokens
   const chunks = [];
-  let currentChunk = [];
+  let currentChunkTokens = [];
+  let wordCount = 0;
 
-  for (const word of words) {
-    currentChunk.push(word);
+  for (const token of tokens) {
+    currentChunkTokens.push(token);
+    // count words (non-whitespace tokens)
+    if (!/\s+/.test(token)) {
+      wordCount += 1;
+    }
 
-    if (currentChunk.length >= maxTokens) {
-      chunks.push(currentChunk.join(" "));
-      currentChunk = [];
+    if (wordCount >= maxTokens) {
+      chunks.push(currentChunkTokens.join(""));
+      currentChunkTokens = [];
+      wordCount = 0;
     }
   }
 
-  if (currentChunk.length > 0) {
-    chunks.push(currentChunk.join(" "));
+  if (currentChunkTokens.length > 0) {
+    chunks.push(currentChunkTokens.join(""));
   }
 
   return chunks;

@@ -97,8 +97,7 @@ const tenantSchema = new mongoose.Schema(
   }
 );
 
-// Index for widget key lookups
-tenantSchema.index({ widgetKey: 1 });
+// Index for domain lookups
 tenantSchema.index({ domain: 1 });
 
 // Method to check if tenant can upload more documents

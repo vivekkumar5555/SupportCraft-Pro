@@ -133,39 +133,68 @@ export const cosineSimilarity = (embedding1, embedding2) => {
 
 /**
  * Generate deterministic embeddings based on text content
- * This creates more meaningful similarity scores for testing
+ * Creates meaningful similarity scores for semantic-like matching
  * @param {string} text - The text to generate embeddings for
  * @returns {number[]} - Array of 1536 deterministic numbers
  */
 const generateDeterministicEmbedding = (text) => {
   const embedding = new Array(1536).fill(0);
-  const words = text
-    .toLowerCase()
-    .split(/\s+/)
-    .filter((word) => word.length > 2);
-
-  // Create a simple hash-based embedding
-  words.forEach((word, wordIndex) => {
-    let hash = 0;
-    for (let i = 0; i < word.length; i++) {
-      hash = ((hash << 5) - hash + word.charCodeAt(i)) & 0xffffffff;
-    }
-
-    // Distribute the hash across multiple dimensions
-    for (let i = 0; i < 10; i++) {
-      const index = Math.abs(hash + i) % 1536;
-      embedding[index] += (wordIndex + 1) * 0.1;
+  const lowerText = text.toLowerCase();
+  
+  // Extract keywords (words > 2 chars, excluding common words)
+  const commonWords = new Set([
+    'the', 'and', 'for', 'are', 'but', 'not', 'you', 'all', 'can', 'her', 
+    'was', 'one', 'our', 'out', 'day', 'get', 'has', 'him', 'his', 'how',
+    'man', 'new', 'now', 'old', 'see', 'two', 'way', 'who', 'boy', 'its',
+    'let', 'put', 'say', 'she', 'too', 'use', 'what', 'your', 'most', 'been',
+    'will', 'would', 'should', 'could', 'may', 'might', 'must', 'have', 'do',
+    'does', 'did', 'is', 'am', 'be', 'if', 'or', 'as', 'at', 'by', 'from',
+    'in', 'of', 'on', 'to', 'with', 'into', 'up', 'also', 'than', 'this'
+  ]);
+  
+  const words = lowerText
+    .match(/\b\w+\b/g) || [];
+  
+  const keywords = words.filter(w => w.length > 2 && !commonWords.has(w));
+  
+  // Create main keyword embeddings
+  keywords.forEach((word, index) => {
+    // Use multiple hash functions for better distribution
+    for (let hashFunc = 0; hashFunc < 3; hashFunc++) {
+      let hash = hashFunc;
+      for (let i = 0; i < word.length; i++) {
+        hash = ((hash << 5) - hash + word.charCodeAt(i)) & 0xffffffff;
+      }
+      
+      // Map to embedding dimensions with stronger weights for main keywords
+      const weightedIndex = Math.abs(hash) % 1536;
+      const weight = (1 / (index + 1)) * (1 + keywords.length) * 0.15; // Higher weights
+      embedding[weightedIndex] += weight;
     }
   });
-
-  // Normalize the embedding
+  
+  // Add character n-grams for substring matching (helps with partial matches)
+  if (keywords.length > 0) {
+    const concat = keywords.join('');
+    for (let i = 0; i < Math.min(concat.length - 2, 20); i++) {
+      const trigram = concat.substring(i, i + 3);
+      let hash = 5381;
+      for (let j = 0; j < trigram.length; j++) {
+        hash = ((hash << 5) + hash) + trigram.charCodeAt(j);
+      }
+      const index = Math.abs(hash) % 1536;
+      embedding[index] += 0.05;
+    }
+  }
+  
+  // Normalize the embedding to unit vector
   const norm = Math.sqrt(embedding.reduce((sum, val) => sum + val * val, 0));
   if (norm > 0) {
     for (let i = 0; i < embedding.length; i++) {
       embedding[i] = embedding[i] / norm;
     }
   }
-
+  
   return embedding;
 };
 

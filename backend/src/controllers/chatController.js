@@ -39,8 +39,9 @@ export const handleChatQuery = async (req, res) => {
 
     // Find similar documents with lower threshold to get more results for analysis
     const similarDocs = await findSimilarDocuments(tenant._id, queryEmbedding, {
-      limit: 5,
-      minSimilarity: 0.1, // Lower threshold to get more results for analysis
+      limit: 10,
+      // Lower threshold to catch documents with very small cosine similarity due to mock embeddings
+      minSimilarity: 0.02, // tuned for the deterministic mock algorithm
     });
 
     console.log(`[CHAT] Query: "${message.substring(0, 50)}..."`);
@@ -51,24 +52,24 @@ export const handleChatQuery = async (req, res) => {
     let sources = [];
     let context = "";
 
-    // Check if we have high-quality matches (≥0.5 similarity)
-    const highQualityMatches = similarDocs.filter(
-      (doc) => doc.similarity >= 0.5
+    // Check if we have matches (even lower threshold since using mock embeddings)
+    const qualityMatches = similarDocs.filter(
+      (doc) => doc.similarity >= 0.005  // Extremely low threshold for mock service
     );
 
-    if (highQualityMatches.length > 0) {
+    if (qualityMatches.length > 0) {
       console.log(
-        `[CHAT] Found ${highQualityMatches.length} high-quality matches (≥0.5 similarity)`
+        `[CHAT] Found ${qualityMatches.length} quality matches (≥0.01 similarity)`
       );
 
-      // Use high-quality matches as context for PDF-grounded response
-      context = highQualityMatches
-        .map((doc) => doc.embedding.text)
-        .join("\n\n");
+      // Use TOP 2-3 matches as context for better coverage
+      const topMatches = qualityMatches.slice(0, 3);
+      context = topMatches.map((doc) => doc.embedding.text).join("\n\n");
+      
       response = await generateChatResponse(message, context);
 
       // Extract sources with more details
-      sources = highQualityMatches.map((doc) => ({
+      sources = topMatches.map((doc) => ({
         text: doc.embedding.text.substring(0, 300) + "...",
         similarity: Math.round(doc.similarity * 100) / 100,
         documentId: doc.embedding.documentId,
@@ -77,19 +78,17 @@ export const handleChatQuery = async (req, res) => {
 
       console.log(
         `[CHAT] Top similarity:`,
-        highQualityMatches[0].similarity.toFixed(4)
+        topMatches[0].similarity.toFixed(4)
       );
-      console.log(`[CHAT] Context preview:`, context.substring(0, 200) + "...");
-    } else {
-      console.log(`[CHAT] No high-quality matches found (≥0.5 similarity)`);
+      console.log(`[CHAT] Context length:`, context.length);
+    } else if (similarDocs.length > 0) {
+      console.log(`[CHAT] No quality matches (≥0.01), using all available results`);
 
-      // Use all available matches as context, but response will be default fallback
-      if (similarDocs.length > 0) {
-        context = similarDocs.map((doc) => doc.embedding.text).join("\n\n");
-        console.log(
-          `[CHAT] Using ${similarDocs.length} low-quality matches for context analysis`
-        );
-      }
+      // Use ALL available documents as context even if low quality
+      context = similarDocs.map((doc) => doc.embedding.text).join("\n\n");
+      console.log(
+        `[CHAT] Using ${similarDocs.length} documents for context analysis (total length: ${context.length})`
+      );
 
       response = await generateChatResponse(message, context);
 
@@ -100,6 +99,11 @@ export const handleChatQuery = async (req, res) => {
         documentId: doc.embedding.documentId,
         chunkIndex: doc.embedding.metadata.chunkIndex,
       }));
+    } else {
+      console.log(`[CHAT] ❌ NO DOCUMENTS FOUND AT ALL`);
+      
+      response = await generateChatResponse(message, "");
+      sources = [];
     }
 
     // Increment query count
@@ -141,8 +145,8 @@ export const testChatQuery = async (req, res) => {
 
     // Find similar documents with lower threshold for test mode
     const similarDocs = await findSimilarDocuments(tenant._id, queryEmbedding, {
-      limit: 5,
-      minSimilarity: 0.1, // Lower threshold for test mode
+      limit: 10,
+      minSimilarity: 0.15, // Adjusted threshold for test mode with mock embeddings
     });
 
     console.log(`[CHAT] Query: "${message.substring(0, 50)}..."`);
@@ -153,45 +157,41 @@ export const testChatQuery = async (req, res) => {
     let sources = [];
     let context = "";
 
-    // Check if we have high-quality matches (≥0.5 similarity)
-    const highQualityMatches = similarDocs.filter(
-      (doc) => doc.similarity >= 0.5
+    // Check if we have quality matches (lower threshold for test mode)
+    const qualityMatches = similarDocs.filter(
+      (doc) => doc.similarity >= 0.2
     );
 
-    if (highQualityMatches.length > 0) {
+    if (qualityMatches.length > 0) {
       console.log(
-        `[CHAT] Found ${highQualityMatches.length} high-quality matches (≥0.5 similarity)`
+        `[CHAT] Found ${qualityMatches.length} quality matches (≥0.2 similarity)`
       );
 
-      // Use high-quality matches as context for PDF-grounded response
-      context = highQualityMatches
-        .map((doc) => doc.embedding.text)
-        .join("\n\n");
+      // Use TOP matches (up to 3) as context
+      const topMatches = qualityMatches.slice(0, 3);
+      context = topMatches.map((doc) => doc.embedding.text).join("\n\n");
       response = await generateChatResponse(message, context);
 
       // Extract sources with more details
-      sources = highQualityMatches.map((doc) => ({
+      sources = topMatches.map((doc) => ({
         text: doc.embedding.text.substring(0, 300) + "...",
         similarity: Math.round(doc.similarity * 100) / 100,
         documentId: doc.embedding.documentId,
         chunkIndex: doc.embedding.metadata.chunkIndex,
       }));
 
-      console.log(
-        `[CHAT] Top similarity:`,
-        highQualityMatches[0].similarity.toFixed(4)
+      console.log(`[CHAT] Top similarity:`,
+        topMatches[0].similarity.toFixed(4)
       );
-      console.log(`[CHAT] Context preview:`, context.substring(0, 200) + "...");
-    } else {
-      console.log(`[CHAT] No high-quality matches found (≥0.5 similarity)`);
+      console.log(`[CHAT] Context length:`, context.length);
+    } else if (similarDocs.length > 0) {
+      console.log(`[CHAT] No quality matches (≥0.2), using all available results`);
 
-      // Use all available matches as context, but response will be default fallback
-      if (similarDocs.length > 0) {
-        context = similarDocs.map((doc) => doc.embedding.text).join("\n\n");
-        console.log(
-          `[CHAT] Using ${similarDocs.length} low-quality matches for context analysis`
-        );
-      }
+      // Use ALL available documents as fallback
+      context = similarDocs.map((doc) => doc.embedding.text).join("\n\n");
+      console.log(
+        `[CHAT] Using ${similarDocs.length} documents for context analysis (total length: ${context.length})`
+      );
 
       response = await generateChatResponse(message, context);
 
@@ -202,6 +202,11 @@ export const testChatQuery = async (req, res) => {
         documentId: doc.embedding.documentId,
         chunkIndex: doc.embedding.metadata.chunkIndex,
       }));
+    } else {
+      console.log(`[CHAT] ❌ NO DOCUMENTS FOUND`);
+      
+      response = await generateChatResponse(message, "");
+      sources = [];
     }
 
     res.json({

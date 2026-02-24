@@ -209,6 +209,8 @@ Add this script tag to any website:
 - `POST /api/chat/test` - Test chat (admin)
 - `GET /api/chat/validate/:key` - Validate widget key
 
+> **Note:** the seed script now respects a `WIDGET_KEY` environment variable so you can keep a constant key across reseeds. Otherwise a new UUID will be generated each time.
+
 ### WebSocket
 
 - `GET /ws/chat` - Real-time chat namespace

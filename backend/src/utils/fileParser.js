@@ -250,27 +250,92 @@ export const cleanTextContent = (text) => {
  * @param {number} maxTokens - Maximum tokens per chunk
  * @returns {Array<string>} - Array of text chunks
  */
-export const splitTextIntoChunks = (text, maxTokens = 800) => {
+export const splitTextIntoChunks = (text, maxTokens = 400) => {
   if (!text || typeof text !== "string") {
     return [];
   }
 
-  const words = text.split(/\s+/);
+  const cleanText = text.trim();
   const chunks = [];
-  let currentChunk = [];
-
-  for (const word of words) {
-    currentChunk.push(word);
-
-    if (currentChunk.length >= maxTokens) {
-      chunks.push(currentChunk.join(" "));
-      currentChunk = [];
+  
+  // Check for Q&A pattern (common in FAQ documents)
+  const qaPattern = /Q\d+:|Question\s*\d*:|A:|Answer\s*\d*:|Q:|qa:/i;
+  
+  if (qaPattern.test(cleanText)) {
+    // Handle Q&A format - split Q&A pairs together
+    // Match patterns like "Q1: ... A1: ..." or "Question: ... Answer: ..."
+    const qaPairs = cleanText.match(
+      /(?:Q\d+:|Question\s*\d*:|Q:)\s*[^(Q|A|Answer)]*?(?=Q\d+:|Question\s*\d*:|A:|Answer\s*\d*:|Q:|$)/gi
+    ) || [];
+    
+    if (qaPairs.length === 0) {
+      // Fallback: split by Q/A markers more aggressively
+      const parts = cleanText.split(/(?=Q\d+:|Question|A\d+:|Answer)/i);
+      let buffer = [];
+      let bufferWords = 0;
+      
+      for (const part of parts) {
+        const words = part.trim().split(/\s+/).length;
+        
+        if (bufferWords + words > maxTokens && buffer.length > 0) {
+          chunks.push(buffer.join(" ").trim());
+          buffer = [];
+          bufferWords = 0;
+        }
+        
+        if (part.trim()) {
+          buffer.push(part.trim());
+          bufferWords += words;
+        }
+      }
+      
+      if (buffer.length > 0) {
+        chunks.push(buffer.join(" ").trim());
+      }
+    } else {
+      // Process Q&A pairs
+      for (const pair of qaPairs) {
+        if (pair.trim().length > 50) { // Only keep substantial chunks
+          chunks.push(pair.trim());
+        }
+      }
+    }
+  } else {
+    // Standard paragraph-based chunking
+    const paragraphs = cleanText.split(/\n\n+/).filter(s => s.trim());
+    
+    for (const para of paragraphs) {
+      const words = para.split(/\s+/).length;
+      
+      if (words <= maxTokens) {
+        // Paragraph fits in one chunk
+        chunks.push(para.trim());
+      } else {
+        // Split large paragraphs by sentences
+        const sentences = para.split(/(?<=[.!?])\s+/).filter(s => s.trim());
+        let buffer = [];
+        let bufferWords = 0;
+        
+        for (const sentence of sentences) {
+          const sentenceWords = sentence.split(/\s+/).length;
+          
+          if (bufferWords + sentenceWords > maxTokens && buffer.length > 0) {
+            chunks.push(buffer.join(" ").trim());
+            buffer = [];
+            bufferWords = 0;
+          }
+          
+          buffer.push(sentence);
+          bufferWords += sentenceWords;
+        }
+        
+        if (buffer.length > 0) {
+          chunks.push(buffer.join(" ").trim());
+        }
+      }
     }
   }
-
-  if (currentChunk.length > 0) {
-    chunks.push(currentChunk.join(" "));
-  }
-
-  return chunks;
+  
+  // Final filter: ensure chunks are substantial (at least 50 chars)
+  return chunks.filter(chunk => chunk.trim().length > 50);
 };

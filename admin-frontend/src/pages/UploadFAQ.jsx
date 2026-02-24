@@ -31,7 +31,7 @@ const UploadFAQ = () => {
     },
     {
       refetchInterval: 5000, // Refetch every 5 seconds to show processing status
-    }
+    },
   );
 
   // Delete document mutation
@@ -45,7 +45,7 @@ const UploadFAQ = () => {
       onError: (error) => {
         toast.error(error.response?.data?.error || "Failed to delete document");
       },
-    }
+    },
   );
 
   const handleDrag = (e) => {
@@ -77,7 +77,7 @@ const UploadFAQ = () => {
       const allowedTypes = ["text/plain", "text/csv", "application/pdf"];
       if (!allowedTypes.includes(file.type)) {
         toast.error(
-          `Invalid file type: ${file.name}. Only TXT, CSV, and PDF files are allowed.`
+          `Invalid file type: ${file.name}. Only TXT, CSV, and PDF files are allowed.`,
         );
         return;
       }
@@ -96,6 +96,8 @@ const UploadFAQ = () => {
       return;
     }
 
+    // Dispatch upload start event
+    window.dispatchEvent(new CustomEvent("uploadStart"));
     setUploading(true);
     try {
       const response = await adminAPI.uploadDocuments(formData);
@@ -143,16 +145,23 @@ const UploadFAQ = () => {
   };
 
   const handleUploadComplete = (uploadId, data) => {
-    console.log(`Upload completed: ${uploadId}`, data);
+    console.log(`[UploadFAQ] Upload completed: ${uploadId}`, data);
     // Remove from active uploads
     setActiveUploads((prev) =>
-      prev.filter((upload) => upload.uploadId !== uploadId)
+      prev.filter((upload) => upload.uploadId !== uploadId),
     );
-    // Force immediate refresh of document list
+    // Force immediate refresh of document list and analytics
+    console.log(`[UploadFAQ] Invalidating and refetching analytics`);
     queryClient.invalidateQueries("documents");
+    queryClient.invalidateQueries("analytics");
     queryClient.refetchQueries("documents");
+    queryClient.refetchQueries("analytics");
+    
+    // Dispatch completion event for Dashboard
+    window.dispatchEvent(new CustomEvent("uploadComplete"));
+    
     toast.success(
-      `✓ Document indexed: ${data.chunkCount} chunks, ${data.embeddingCount} embeddings`
+      `✓ Document indexed: ${data.chunkCount} chunks, ${data.embeddingCount} embeddings`,
     );
   };
 
@@ -160,7 +169,7 @@ const UploadFAQ = () => {
     console.error(`Upload failed: ${uploadId}`, error);
     // Remove from active uploads
     setActiveUploads((prev) =>
-      prev.filter((upload) => upload.uploadId !== uploadId)
+      prev.filter((upload) => upload.uploadId !== uploadId),
     );
     // Refresh document list to show failed status
     queryClient.invalidateQueries("documents");
@@ -356,7 +365,7 @@ const UploadFAQ = () => {
                     <div className="flex items-center space-x-2">
                       <span
                         className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
-                          doc.processingStatus
+                          doc.processingStatus,
                         )}`}
                       >
                         {doc.processingStatus}
@@ -366,7 +375,7 @@ const UploadFAQ = () => {
                         <div className="text-xs text-gray-500 font-medium">
                           {doc.chunkCount > 0
                             ? Math.round(
-                                (doc.embeddingCount / doc.chunkCount) * 100
+                                (doc.embeddingCount / doc.chunkCount) * 100,
                               )
                             : 0}
                           %

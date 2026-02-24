@@ -6,7 +6,7 @@ import User from "../models/User.js";
 import Tenant from "../models/Tenant.js";
 import Document from "../models/Document.js";
 import Embedding from "../models/Embedding.js";
-import { parseFileContent } from "../utils/fileParser.js";
+import { parseFileContent, splitTextIntoChunks } from "../utils/fileParser.js";
 // TEMPORARY: Using mock service for testing (no OpenAI required)
 // To use real OpenAI: change to "../services/embeddingService.js"
 import {
@@ -214,8 +214,8 @@ const processDocumentAsync = async (documentId, tenantId) => {
     document.processingStatus = "processing";
     await document.save();
 
-    // Split content into chunks
-    const chunks = splitTextIntoChunks(document.content, 800); // 800 tokens per chunk
+    // Split content into chunks using improved chunking strategy
+    const chunks = splitTextIntoChunks(document.content);
 
     if (chunks.length === 0) {
       throw new Error("No content chunks generated from document");
@@ -403,28 +403,7 @@ const generateBatchEmbeddingsWithRetry = async (texts, maxRetries = 3) => {
 };
 
 // Split text into chunks
-const splitTextIntoChunks = (text, maxTokens) => {
-  const words = text.split(/\s+/);
-  const chunks = [];
-  let currentChunk = [];
 
-  for (const word of words) {
-    currentChunk.push(word);
-
-    if (currentChunk.length >= maxTokens) {
-      chunks.push(currentChunk.join(" "));
-      currentChunk = [];
-    }
-  }
-
-  if (currentChunk.length > 0) {
-    chunks.push(currentChunk.join(" "));
-  }
-
-  return chunks;
-};
-
-// Get all documents for tenant
 export const getDocuments = async (req, res) => {
   try {
     const userId = req.userId;

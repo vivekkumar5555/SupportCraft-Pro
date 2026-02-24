@@ -23,6 +23,8 @@ const UploadProgress = ({ uploadId, filename, onComplete, onError }) => {
 
         if (!isMounted) return;
 
+        console.log(`[UploadProgress] ${filename} status:`, response.data);
+
         setStatus({
           status: response.data.status,
           progress: response.data.progress,
@@ -34,11 +36,13 @@ const UploadProgress = ({ uploadId, filename, onComplete, onError }) => {
 
         // Stop polling if completed or failed
         if (response.data.status === "completed") {
+          console.log(`[UploadProgress] ${filename} COMPLETED`);
           clearInterval(pollInterval);
           if (onComplete) {
             onComplete(uploadId, response.data);
           }
         } else if (response.data.status === "failed") {
+          console.log(`[UploadProgress] ${filename} FAILED`);
           clearInterval(pollInterval);
           if (onError) {
             onError(uploadId, response.data.error);
@@ -154,4 +158,3 @@ UploadProgress.propTypes = {
 };
 
 export default UploadProgress;
-

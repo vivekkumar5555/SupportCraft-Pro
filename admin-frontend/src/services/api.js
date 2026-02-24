@@ -22,12 +22,16 @@ api.interceptors.request.use(
   },
   (error) => {
     return Promise.reject(error);
-  }
+  },
 );
 
 // Response interceptor to handle errors
 api.interceptors.response.use(
   (response) => {
+    // Log analytics requests for debugging
+    if (response.config.url.includes("/analytics")) {
+      console.log("[API] Analytics response:", response.data);
+    }
     return response;
   },
   (error) => {
@@ -47,7 +51,7 @@ api.interceptors.response.use(
     }
 
     return Promise.reject(error);
-  }
+  },
 );
 
 // Auth API

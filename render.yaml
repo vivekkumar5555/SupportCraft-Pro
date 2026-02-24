@@ -41,4 +41,3 @@ services:
     plan: free
     buildCommand: cd widget && npm install && npm run build
     staticPublishPath: ./widget/dist
-

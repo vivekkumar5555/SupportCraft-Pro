@@ -8,6 +8,7 @@ module.exports = {
     filename: "widget.js",
     library: "SupportWidget",
     libraryTarget: "umd",
+    libraryExport: "default",
     globalObject: "this",
   },
   module: {
@@ -37,11 +38,7 @@ module.exports = {
       filename: "index.html",
     }),
   ],
-  externals: {
-    react: "React",
-    "react-dom": "ReactDOM",
-  },
   optimization: {
-    minimize: true,
+    minimize: false,
   },
 };

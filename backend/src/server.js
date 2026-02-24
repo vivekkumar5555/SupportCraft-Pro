@@ -10,6 +10,7 @@ import helmet from "helmet";
 import mongoose from "mongoose";
 import fs from "fs/promises";
 import path from "path";
+import net from "net";
 
 // Import routes
 import authRoutes from "./routes/authRoutes.js";
@@ -112,15 +113,35 @@ app.use("*", (req, res) => {
   res.status(404).json({ error: "Route not found" });
 });
 
-const PORT = process.env.PORT || 5000;
+const START_PORT = parseInt(process.env.PORT, 10) || 5000;
+
+// helper to find an available port starting from `port`
+const findFreePort = (port) => {
+  return new Promise((resolve, reject) => {
+    const tester = net.createServer();
+    tester.once('error', (err) => {
+      if (err.code === 'EADDRINUSE') {
+        // try next port
+        resolve(findFreePort(port + 1));
+      } else {
+        reject(err);
+      }
+    });
+    tester.once('listening', () => {
+      tester.close(() => resolve(port));
+    });
+    tester.listen(port);
+  });
+};
 
 // Start server
 const startServer = async () => {
   // Ensure uploads directory exists
   await ensureUploadsDir();
 
-  server.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+  const port = await findFreePort(START_PORT);
+  server.listen(port, () => {
+    console.log(`Server running on port ${port}`);
     console.log(`Environment: ${process.env.NODE_ENV}`);
   });
 };
