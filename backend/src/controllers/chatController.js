@@ -1,10 +1,14 @@
 import Tenant from "../models/Tenant.js";
 import Embedding from "../models/Embedding.js";
-// TEMPORARY: Using mock services for testing (no OpenAI required)
-// To use real OpenAI: change to "../services/embeddingService.js" and "../services/chatService.js"
 import { generateEmbeddings } from "../services/embeddingService.mock.js";
 import { findSimilarDocuments } from "../services/similarityService.js";
-import { generateChatResponse } from "../services/chatService.pdf.js";
+import { generateChatResponse as generateChatResponsePDF } from "../services/chatService.pdf.js";
+import { generateChatResponse as generateChatResponseAI } from "../services/chatService.js";
+
+// Use OpenAI for chat if OPENAI_API_KEY is set, otherwise fall back to PDF-grounded
+const generateChatResponse = process.env.OPENAI_API_KEY
+  ? generateChatResponseAI
+  : generateChatResponsePDF;
 
 // Handle chat query
 export const handleChatQuery = async (req, res) => {
