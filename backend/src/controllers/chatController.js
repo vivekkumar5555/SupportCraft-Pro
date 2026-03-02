@@ -5,10 +5,17 @@ import { findSimilarDocuments } from "../services/similarityService.js";
 import { generateChatResponse as generateChatResponsePDF } from "../services/chatService.pdf.js";
 import { generateChatResponse as generateChatResponseAI } from "../services/chatService.js";
 
-// Use OpenAI for chat if OPENAI_API_KEY is set, otherwise fall back to PDF-grounded
-const generateChatResponse = process.env.OPENAI_API_KEY
-  ? generateChatResponseAI
-  : generateChatResponsePDF;
+// Try OpenAI first; if it fails for any reason, fall back to PDF-grounded
+const generateChatResponse = async (message, context, options) => {
+  if (process.env.OPENAI_API_KEY) {
+    try {
+      return await generateChatResponseAI(message, context, options);
+    } catch (err) {
+      console.error("[CHAT] OpenAI failed, falling back to PDF service:", err.message);
+    }
+  }
+  return generateChatResponsePDF(message, context, options);
+};
 
 // Handle chat query
 export const handleChatQuery = async (req, res) => {
