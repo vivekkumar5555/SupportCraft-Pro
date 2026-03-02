@@ -54,6 +54,27 @@ const io = new Server(server, {
   },
 });
 
+// Serve widget files (loader.js + built widget.js) from the backend
+// so we don't depend on a separate static-site service.
+const widgetDir = path.resolve(process.cwd(), "../widget");
+app.get("/widget/loader.js", (req, res) => {
+  res.set({
+    "Access-Control-Allow-Origin": "*",
+    "Content-Type": "application/javascript",
+    "Cache-Control": "no-cache, no-store, must-revalidate",
+  });
+  res.sendFile(path.join(widgetDir, "loader.js"));
+});
+app.use(
+  "/widget/build",
+  express.static(path.join(widgetDir, "build"), {
+    setHeaders(res) {
+      res.set("Access-Control-Allow-Origin", "*");
+      res.set("Cache-Control", "no-cache, no-store, must-revalidate");
+    },
+  })
+);
+
 // Middleware
 app.use(helmet());
 

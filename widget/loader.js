@@ -13,20 +13,20 @@
     document.currentScript || document.querySelector("script[data-widget-key]");
   const scriptSrc = script?.src || "";
 
-  // Default host is derived from where this script is served from (works in both dev and prod)
-  const defaultHost = scriptSrc
-    ? new URL(scriptSrc).origin
-    : "https://supportcraft-pro-widget.onrender.com";
-  const defaultApi =
+  // In production the loader is served from the backend at /widget/loader.js,
+  // so the origin already points to the backend.
+  const scriptOrigin = scriptSrc ? new URL(scriptSrc).origin : "";
+  const defaultBackend =
+    scriptOrigin ||
     "https://supportcraft-pro-support-widget-backend.onrender.com";
 
   // Configuration (allow override via data-api-url, data-ws-url, data-widget-url)
   const CONFIG = {
-    apiUrl: script?.getAttribute("data-api-url") || defaultApi + "/api",
-    wsUrl: script?.getAttribute("data-ws-url") || defaultApi,
+    apiUrl: script?.getAttribute("data-api-url") || defaultBackend + "/api",
+    wsUrl: script?.getAttribute("data-ws-url") || defaultBackend,
     widgetUrl:
       script?.getAttribute("data-widget-url") ||
-      defaultHost + "/build/widget.js",
+      defaultBackend + "/widget/build/widget.js",
     version: "1.0.0",
   };
 
