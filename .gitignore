@@ -14,7 +14,8 @@ yarn-error.log*
 # Build outputs
 dist/
 build/
-backend/widget-assets/
+# Allow committed widget bundle for backend to serve
+!backend/widget-assets/build/
 *.tgz
 *.tar.gz
 

@@ -62,13 +62,13 @@ export const API_CONFIG = {
 
 ## 🔧 Render Backend Service (required for widget to load)
 
-The backend serves the widget files (`/widget/loader.js` and `/widget/build/widget.js`). For that to work:
+The backend serves the widget files from `backend/widget-assets/` (committed in the repo). Set:
 
-1. **Root Directory** must be **empty** (repo root). Do **not** set it to `backend`, or the widget build step will not run.
-2. **Build Command:** `npm run build:render-backend`
-3. **Start Command:** `cd backend && node src/server.js`
+1. **Root Directory:** `backend`
+2. **Build Command:** `npm install`
+3. **Start Command:** `node src/server.js`
 
-If you had Root Directory set to `backend`, change it to empty and redeploy.
+When you change the widget code, run `npm run build` in `widget/`, then copy `widget/loader.js` and `widget/build/widget.js` into `backend/widget-assets/` and `backend/widget-assets/build/`, then commit and push.
 
 ---
 
