@@ -2,7 +2,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
-const PORT = 8080;
+const PORT = process.env.PORT || 8080;
 
 const server = http.createServer((req, res) => {
   // CORS headers
@@ -16,7 +16,9 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  let filePath = req.url === '/' ? '/loader.js' : req.url;
+  // Strip query string (e.g. ?v=1.0.0) before resolving path
+  const urlPath = req.url.split('?')[0];
+  let filePath = urlPath === '/' ? '/loader.js' : urlPath;
   filePath = path.join(__dirname, filePath);
   filePath = path.normalize(filePath);
 
@@ -57,9 +59,9 @@ const server = http.createServer((req, res) => {
   });
 });
 
-server.listen(PORT, () => {
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`\n🚀 Widget Server Running!`);
-  console.log(`📍 http://localhost:${PORT}`);
-  console.log(`📍 Loader: http://localhost:${PORT}/loader.js`);
-  console.log(`📍 Widget: http://localhost:${PORT}/build/widget.js\n`);
+  console.log(`📍 http://0.0.0.0:${PORT}`);
+  console.log(`📍 Loader: http://0.0.0.0:${PORT}/loader.js`);
+  console.log(`📍 Widget: http://0.0.0.0:${PORT}/build/widget.js\n`);
 });

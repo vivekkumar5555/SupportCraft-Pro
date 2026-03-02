@@ -33,11 +33,11 @@ services:
       - key: NODE_ENV
         value: production
 
-  # Widget Static Site
+  # Widget Node.js Service (serves loader.js and build/widget.js)
   - type: web
     name: supportcraft-pro-widget
-    env: static
+    runtime: node
     region: oregon
     plan: free
     buildCommand: cd widget && npm install && npm run build
-    staticPublishPath: ./widget/dist
+    startCommand: cd widget && node server.js
