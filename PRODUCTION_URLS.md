@@ -195,25 +195,38 @@ The configuration automatically switches based on `NODE_ENV` and Vite's build mo
 cat admin-frontend/src/config.js
 ```
 
-### Issue: Widget not loading
+### Issue: Widget not loading / Widget not showing on other sites
+
+**Cause:** The embed script was pointing to `localhost` or missing production API URLs, so the widget only worked locally.
+
+**Fix:** Use the production embed with explicit API and widget URLs (see **Widget Embed Code** above). Your test page must use:
+
+- `src="https://supportcraft-pro-widget.onrender.com/loader.js?v=1.0.0"` (production widget origin)
+- `data-api-url="https://supportcraft-pro-support-widget-backend.onrender.com/api"`
+- `data-ws-url="https://supportcraft-pro-support-widget-backend.onrender.com"`
+- `data-widget-url="https://supportcraft-pro-widget.onrender.com/build/widget.js"`
 
 **Check:**
 
 1. Widget build is complete
-2. Loader.js has correct URLs
+2. Loader script loads from production URL (not localhost)
 3. Widget key is valid
 4. Backend WebSocket is accessible
+5. No CORS/blocked mixed content (use HTTPS everywhere)
 
-**Fix:**
+### Issue: 304 response / Stale cache (HTML or loader.js not updating)
 
-```bash
-# Rebuild widget
-cd widget
-npm run build
-git add .
-git commit -m "Rebuild widget"
-git push origin main
-```
+**Cause:** The browser or CDN is serving a cached version, so you see 304 Not Modified and don’t get your latest changes.
+
+**Fixes:**
+
+1. **Cache-bust the script:** Use a version query on the loader, e.g. `loader.js?v=1.0.0` (bump the version after deployments).
+2. **Hard refresh:** Ctrl+Shift+R (Windows/Linux) or Cmd+Shift+R (Mac).
+3. **Render static site (widget):** In [Render Dashboard](https://dashboard.render.com) → your widget static site → **Settings** → **HTTP Headers**, add path-based headers so the widget assets are not cached aggressively:
+   - Path: `/*` or `/loader.js` and `/build/*`
+   - Header: `Cache-Control: no-cache, no-store, must-revalidate`
+   This makes the browser revalidate and avoids stale 304s for the widget.
+4. **Test HTML:** If you serve your test HTML from a server, configure that server to send `Cache-Control: no-cache` for the HTML file.
 
 ### Issue: CORS errors
 

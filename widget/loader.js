@@ -12,14 +12,21 @@
   const script =
     document.currentScript || document.querySelector("script[data-widget-key]");
   const scriptSrc = script?.src || "";
-  const defaultHost = scriptSrc ? new URL(scriptSrc).origin : "http://localhost:8080";
-  const defaultApi = "http://localhost:5000";
 
-  // Configuration (allow override via data-api-url and data-widget-url for external/test pages)
+  // Default host is derived from where this script is served from (works in both dev and prod)
+  const defaultHost = scriptSrc
+    ? new URL(scriptSrc).origin
+    : "https://supportcraft-pro-widget.onrender.com";
+  const defaultApi =
+    "https://supportcraft-pro-support-widget-backend.onrender.com";
+
+  // Configuration (allow override via data-api-url, data-ws-url, data-widget-url)
   const CONFIG = {
     apiUrl: script?.getAttribute("data-api-url") || defaultApi + "/api",
     wsUrl: script?.getAttribute("data-ws-url") || defaultApi,
-    widgetUrl: script?.getAttribute("data-widget-url") || defaultHost + "/build/widget.js",
+    widgetUrl:
+      script?.getAttribute("data-widget-url") ||
+      defaultHost + "/build/widget.js",
     version: "1.0.0",
   };
 

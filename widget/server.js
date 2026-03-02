@@ -42,7 +42,16 @@ const server = http.createServer((req, res) => {
       '.css': 'text/css'
     };
 
-    res.writeHead(200, { 'Content-Type': mimeTypes[ext] || 'text/plain' });
+    // Prevent 304 / aggressive caching so widget and loader updates are always fetched
+    const cacheControl = 'no-cache, no-store, must-revalidate';
+    const headers = {
+      'Content-Type': mimeTypes[ext] || 'text/plain',
+      'Cache-Control': cacheControl,
+      'Pragma': 'no-cache',
+      'Expires': '0',
+    };
+
+    res.writeHead(200, headers);
     res.end(data);
     console.log(`✅ 200: ${req.url}`);
   });

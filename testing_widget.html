@@ -4,6 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>Widget Test Page</title>
     <style>
         body {
@@ -54,8 +57,14 @@
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
 
-    <!-- Support Widget Loader -->
-    <script src="http://localhost:8080/loader.js" data-widget-key="1b8f3079-ca27-4254-9177-d5fe9a4ad051"></script>
+    <!-- Support Widget Loader - Production URLs (use so widget shows when embedded on any site) -->
+    <script
+        src="https://supportcraft-pro-widget.onrender.com/loader.js?v=1.0.0"
+        data-widget-key="1b8f3079-ca27-4254-9177-d5fe9a4ad051"
+        data-api-url="https://supportcraft-pro-support-widget-backend.onrender.com/api"
+        data-ws-url="https://supportcraft-pro-support-widget-backend.onrender.com"
+        data-widget-url="https://supportcraft-pro-widget.onrender.com/build/widget.js"
+    ></script>
 
 </body>
 

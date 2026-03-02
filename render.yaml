@@ -36,7 +36,7 @@ services:
   # Widget Static Site
   - type: web
     name: supportcraft-pro-widget
-    runtime: static
+    env: static
     region: oregon
     plan: free
     buildCommand: cd widget && npm install && npm run build

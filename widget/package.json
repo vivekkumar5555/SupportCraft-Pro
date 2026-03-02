@@ -4,7 +4,7 @@
   "description": "Embeddable support widget",
   "main": "loader.js",
   "scripts": {
-    "build": "webpack --mode=production",
+    "build": "webpack --mode=production && node scripts/copy-dist.js",
     "dev": "webpack --mode=development --watch",
     "start": "node server.js"
   },
