@@ -33,11 +33,15 @@ services:
       - key: NODE_ENV
         value: production
 
-  # Widget Node.js Service (serves loader.js and build/widget.js)
+  # Widget Static Site
   - type: web
     name: supportcraft-pro-widget
-    runtime: node
+    env: static
     region: oregon
     plan: free
     buildCommand: cd widget && npm install && npm run build
-    startCommand: cd widget && node server.js
+    staticPublishPath: ./widget/dist
+    headers:
+      - path: /*
+        name: Cache-Control
+        value: no-cache, no-store, must-revalidate

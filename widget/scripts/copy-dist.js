@@ -37,4 +37,14 @@ const buildDir = path.join(root, "build");
   }
 });
 
+// Verify the files exist
+const requiredFiles = [
+  path.join(distDir, "loader.js"),
+  path.join(distBuildDir, "widget.js"),
+];
+const missing = requiredFiles.filter((f) => !fs.existsSync(f));
+if (missing.length > 0) {
+  console.error("  ERROR: Missing required files:", missing);
+  process.exit(1);
+}
 console.log("  dist/ ready for deploy (loader.js + build/widget.js)\n");
