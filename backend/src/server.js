@@ -81,6 +81,10 @@ app.use(helmet());
 // Clean up FRONTEND_URL (remove trailing slash if present)
 const frontendUrl = process.env.FRONTEND_URL?.replace(/\/$/, '');
 
+// Widget chat routes need open CORS (embedded on any customer website)
+app.use("/api/chat", cors({ origin: true }));
+
+// Admin routes use restrictive CORS (only the admin dashboard)
 app.use(
   cors({
     origin: frontendUrl,
