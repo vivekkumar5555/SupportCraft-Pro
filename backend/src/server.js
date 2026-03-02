@@ -70,20 +70,21 @@ try {
 } catch {
   widgetDirResolved = widgetDirFallback;
 }
+// Allow cross-origin script loading (embed on any site); avoid Helmet's same-origin block
+const widgetHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Cache-Control": "no-cache, no-store, must-revalidate",
+  "Cross-Origin-Resource-Policy": "cross-origin",
+};
 app.get("/widget/loader.js", (req, res) => {
-  res.set({
-    "Access-Control-Allow-Origin": "*",
-    "Content-Type": "application/javascript",
-    "Cache-Control": "no-cache, no-store, must-revalidate",
-  });
+  res.set({ ...widgetHeaders, "Content-Type": "application/javascript" });
   res.sendFile(path.join(widgetDirResolved, "loader.js"));
 });
 app.use(
   "/widget/build",
   express.static(path.join(widgetDirResolved, "build"), {
     setHeaders(res) {
-      res.set("Access-Control-Allow-Origin", "*");
-      res.set("Cache-Control", "no-cache, no-store, must-revalidate");
+      res.set(widgetHeaders);
     },
   })
 );

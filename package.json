@@ -13,6 +13,7 @@
     "backend:build": "cd backend && npm run build",
     "admin:build": "cd admin-frontend && npm run build",
     "widget:build": "cd widget && npm run build",
+    "build:render-backend": "cd widget && npm install && npm run build && cd ../backend && mkdir -p widget-assets/build && cp ../widget/loader.js widget-assets/ && cp ../widget/build/widget.js widget-assets/build/ && npm install",
     "install:all": "npm install && cd backend && npm install && cd ../admin-frontend && npm install && cd ../widget && npm install"
   },
   "keywords": ["ai", "chatbot", "support", "widget", "mern"],
