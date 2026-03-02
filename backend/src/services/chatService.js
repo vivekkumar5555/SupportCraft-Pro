@@ -51,7 +51,9 @@ export const generateChatResponse = async (
 
     const systemMessage = systemPrompt || defaultSystemPrompt;
 
-    // Construct the prompt with context
+    // Normalize context (may be array of chunks or a string)
+    const contextStr = Array.isArray(context) ? context.join("\n\n") : (context || "");
+
     const messages = [
       {
         role: "system",
@@ -59,12 +61,7 @@ export const generateChatResponse = async (
       },
       {
         role: "user",
-        content: `Context from knowledge base:
-${context}
-
-User question: ${userMessage}
-
-Please provide a helpful response based on the context above.`,
+        content: `Context from knowledge base:\n${contextStr}\n\nUser question: ${userMessage}\n\nPlease provide a helpful response based on the context above.`,
       },
     ];
 
