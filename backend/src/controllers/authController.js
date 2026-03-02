@@ -99,6 +99,7 @@ export const login = async (req, res) => {
         name: user.tenantId.name,
         widgetKey: user.tenantId.widgetKey,
         brandSettings: user.tenantId.brandSettings,
+        subscription: user.tenantId.subscription,
       },
     });
   } catch (error) {
@@ -128,6 +129,7 @@ export const getProfile = async (req, res) => {
         widgetKey: user.tenantId.widgetKey,
         brandSettings: user.tenantId.brandSettings,
         settings: user.tenantId.settings,
+        subscription: user.tenantId.subscription,
       },
     });
   } catch (error) {

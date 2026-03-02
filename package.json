@@ -4,9 +4,11 @@
   "description": "White-label AI support widget with MERN stack",
   "main": "index.js",
   "scripts": {
-    "dev": "concurrently \"npm run backend:dev\" \"npm run admin:dev\"",
+    "dev": "concurrently \"npm run backend:dev\" \"npm run admin:dev\" \"npm run widget:serve\"",
     "backend:dev": "cd backend && npm run dev",
     "admin:dev": "cd admin-frontend && npm run dev",
+    "widget:serve": "cd widget && node server.js",
+    "dev:all": "concurrently \"npm run backend:dev\" \"npm run admin:dev\" \"npm run widget:serve\"",
     "build": "npm run backend:build && npm run admin:build && npm run widget:build",
     "backend:build": "cd backend && npm run build",
     "admin:build": "cd admin-frontend && npm run build",

@@ -77,6 +77,10 @@ export const adminAPI = {
   updateSettings: (data) => api.put("/admin/settings", data),
   getAnalytics: () => api.get("/admin/analytics"),
   updateSubscriptionPlan: (plan) => api.put("/admin/subscription", { plan }),
+  // Social integrations
+  getSocialSettings: () => api.get("/admin/social"),
+  updateWhatsApp: (data) => api.put("/admin/social/whatsapp", data),
+  updateInstagram: (data) => api.put("/admin/social/instagram", data),
 };
 
 // Chat API

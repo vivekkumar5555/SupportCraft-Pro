@@ -66,17 +66,24 @@ export const findSimilarDocuments = async (
       }
     });
 
+    // Sort all by similarity (descending) first
+    const sortedBySimilarity = similarities.sort(
+      (a, b) => b.similarity - a.similarity
+    );
+
     // Filter by minimum similarity threshold
-    const filteredResults = similarities.filter(
+    const filteredResults = sortedBySimilarity.filter(
       (item) => item.similarity >= minSimilarity
     );
 
-    // Sort by similarity (descending) and limit results
-    const sortedResults = filteredResults
-      .sort((a, b) => b.similarity - a.similarity)
-      .slice(0, limit);
+    // If no results pass threshold but we have embeddings, return top-K anyway
+    // so the chatbot can still use document context (e.g. mock embeddings give low scores)
+    const results =
+      filteredResults.length > 0
+        ? filteredResults.slice(0, limit)
+        : sortedBySimilarity.slice(0, limit);
 
-    return sortedResults;
+    return results;
   } catch (error) {
     console.error("Error finding similar documents:", error);
     throw new Error(`Failed to find similar documents: ${error.message}`);

@@ -8,17 +8,21 @@
 (function () {
   "use strict";
 
-  // Configuration
+  // Get widget configuration from script tag (must be before CONFIG so we can use data-* URLs)
+  const script =
+    document.currentScript || document.querySelector("script[data-widget-key]");
+  const scriptSrc = script?.src || "";
+  const defaultHost = scriptSrc ? new URL(scriptSrc).origin : "http://localhost:8080";
+  const defaultApi = "http://localhost:5000";
+
+  // Configuration (allow override via data-api-url and data-widget-url for external/test pages)
   const CONFIG = {
-    apiUrl: "http://localhost:5000/api",
-    wsUrl: "http://localhost:5000",
-    widgetUrl: "http://localhost:8080/build/widget.js",
+    apiUrl: script?.getAttribute("data-api-url") || defaultApi + "/api",
+    wsUrl: script?.getAttribute("data-ws-url") || defaultApi,
+    widgetUrl: script?.getAttribute("data-widget-url") || defaultHost + "/build/widget.js",
     version: "1.0.0",
   };
 
-  // Get widget configuration from script tag
-  const script =
-    document.currentScript || document.querySelector("script[data-widget-key]");
   const widgetKey = script?.getAttribute("data-widget-key");
 
   if (!widgetKey) {

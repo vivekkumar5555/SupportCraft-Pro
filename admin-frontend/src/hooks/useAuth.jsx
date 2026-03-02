@@ -24,6 +24,9 @@ export const AuthProvider = ({ children }) => {
         .getProfile()
         .then((response) => {
           setUser(response.data.user);
+          if (response.data.tenant) {
+            localStorage.setItem("tenant", JSON.stringify(response.data.tenant));
+          }
         })
         .catch((error) => {
           console.error("Token verification failed:", error);

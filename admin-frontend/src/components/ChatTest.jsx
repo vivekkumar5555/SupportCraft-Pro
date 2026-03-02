@@ -1,15 +1,72 @@
-import { useState } from "react";
-import { useQuery } from "react-query";
-import { Send, Bot, User, Copy, Check } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
 import { chatAPI } from "../services/api";
-import LoadingSpinner from "../components/LoadingSpinner";
+import {
+  Send,
+  Bot,
+  User,
+  Copy,
+  Check,
+  Trash2,
+  Sparkles,
+  MessageSquare,
+  Loader2,
+} from "lucide-react";
 import toast from "react-hot-toast";
+
+const EXAMPLE_PROMPTS = [
+  "What are your business hours?",
+  "How can I contact support?",
+  "Tell me about your products",
+  "What payment methods do you accept?",
+];
+
+const formatRelativeTime = (timestamp) => {
+  const date = new Date(timestamp);
+  const now = new Date();
+  const diffMs = now - date;
+  const diffSec = Math.floor(diffMs / 1000);
+  const diffMin = Math.floor(diffSec / 60);
+  const diffHour = Math.floor(diffMin / 60);
+
+  if (diffSec < 10) return "just now";
+  if (diffSec < 60) return `${diffSec}s ago`;
+  if (diffMin < 60) return `${diffMin}m ago`;
+  if (diffHour < 24) return `${diffHour}h ago`;
+  return date.toLocaleDateString();
+};
+
+const TypingIndicator = () => (
+  <div className="flex items-center gap-1.5 px-1 py-2">
+    <span
+      className="w-2 h-2 rounded-full bg-gray-500 animate-typing-bounce"
+      style={{ animationDelay: "0ms" }}
+    />
+    <span
+      className="w-2 h-2 rounded-full bg-gray-500 animate-typing-bounce"
+      style={{ animationDelay: "160ms" }}
+    />
+    <span
+      className="w-2 h-2 rounded-full bg-gray-500 animate-typing-bounce"
+      style={{ animationDelay: "320ms" }}
+    />
+  </div>
+);
 
 const ChatTest = () => {
   const [message, setMessage] = useState("");
   const [responses, setResponses] = useState([]);
   const [testing, setTesting] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState(null);
+  const messagesEndRef = useRef(null);
+  const messagesContainerRef = useRef(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [responses, testing]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -19,39 +76,35 @@ const ChatTest = () => {
     setMessage("");
     setTesting(true);
 
-    // Add user message to responses
-    const newResponses = [...responses, { type: "user", content: userMessage }];
+    const userMsg = {
+      type: "user",
+      content: userMessage,
+      timestamp: new Date().toISOString(),
+    };
+    const newResponses = [...responses, userMsg];
     setResponses(newResponses);
 
     try {
-      const response = await chatAPI.testQuery(userMessage);
+      const { data } = await chatAPI.testQuery(userMessage);
       const botResponse = {
         type: "bot",
         content:
-          response.data.response ||
-          response.data.message ||
-          "No response received",
-        confidence: response.data.confidence,
-        source: response.data.source,
-        messageType: response.data.messageType,
-        sources: response.data.sources,
-        isFallback: response.data.isFallback,
-        timestamp: new Date().toISOString(),
+          data.response || data.message || "No response received",
+        confidence: data.confidence,
+        source: data.source,
+        messageType: data.messageType,
+        sources: data.sources,
+        isFallback: data.isFallback,
+        timestamp: data.timestamp || new Date().toISOString(),
       };
       setResponses([...newResponses, botResponse]);
     } catch (error) {
-      console.error("Test chat error:", error);
-      let errorMessage =
-        "Sorry, I encountered an error processing your request.";
-
-      if (error.response?.status === 401) {
-        errorMessage =
-          "⚠️ Authentication error. Please logout and login again.";
-      } else if (error.response?.data?.error) {
-        errorMessage = `Error: ${error.response.data.error}`;
-      } else if (error.message) {
-        errorMessage = `Error: ${error.message}`;
-      }
+      const errorMessage =
+        error.response?.status === 401
+          ? "Authentication error. Please logout and login again."
+          : error.response?.data?.error
+            ? error.response.data.error
+            : error.message || "Sorry, I encountered an error processing your request.";
 
       const errorResponse = {
         type: "bot",
@@ -66,213 +119,209 @@ const ChatTest = () => {
     }
   };
 
+  const handleExampleClick = (prompt) => {
+    setMessage(prompt);
+  };
+
   const copyToClipboard = async (text, index) => {
     try {
       await navigator.clipboard.writeText(text);
       setCopiedIndex(index);
-      toast.success("Copied to clipboard!");
+      toast.success("Copied to clipboard");
       setTimeout(() => setCopiedIndex(null), 2000);
-    } catch (error) {
-      toast.error("Failed to copy to clipboard");
+    } catch {
+      toast.error("Failed to copy");
     }
   };
 
   const clearChat = () => {
     setResponses([]);
+    toast.success("Chat cleared");
   };
 
   return (
-    <div className="flex flex-col h-96">
-      {/* Chat Messages */}
-      <div className="flex-1 overflow-y-auto space-y-4 mb-4">
-        {responses.length === 0 ? (
-          <div className="text-center py-8">
-            <Bot className="mx-auto h-12 w-12 text-gray-400" />
-            <h3 className="mt-2 text-sm font-medium text-gray-900">
-              Test your chatbot
-            </h3>
-            <p className="mt-1 text-sm text-gray-500">
-              Ask a question to see how your chatbot responds.
-            </p>
+    <div className="flex flex-col h-[480px] bg-white rounded-xl border border-gray-200 shadow-card overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-gray-50">
+        <div className="flex items-center gap-2">
+          <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary-100">
+            <MessageSquare className="w-4 h-4 text-primary-600" />
           </div>
-        ) : (
-          responses.map((response, index) => (
-            <div
-              key={index}
-              className={`flex ${
-                response.type === "user" ? "justify-end" : "justify-start"
-              }`}
-            >
-              <div
-                className={`flex max-w-xs lg:max-w-md ${
-                  response.type === "user" ? "flex-row-reverse" : "flex-row"
-                }`}
-              >
-                <div
-                  className={`flex-shrink-0 ${
-                    response.type === "user" ? "ml-2" : "mr-2"
-                  }`}
-                >
-                  {response.type === "user" ? (
-                    <div className="h-8 w-8 rounded-full bg-primary-600 flex items-center justify-center">
-                      <User className="h-4 w-4 text-white" />
-                    </div>
-                  ) : (
-                    <div className="h-8 w-8 rounded-full bg-gray-600 flex items-center justify-center">
-                      <Bot className="h-4 w-4 text-white" />
-                    </div>
-                  )}
-                </div>
-                <div
-                  className={`rounded-lg px-4 py-2 ${
-                    response.type === "user"
-                      ? "bg-primary-600 text-white"
-                      : response.isError
-                      ? "bg-red-100 text-red-800"
-                      : "bg-gray-100 text-gray-900"
-                  }`}
-                >
-                  <p className="text-sm">{response.content}</p>
-
-                  {response.type === "bot" && !response.isError && (
-                    <div className="mt-2 space-y-2">
-                      {/* Source indicator */}
-                      {response.source && (
-                        <div className="text-xs opacity-75">
-                          {response.source === "pdf" && (
-                            <span className="text-green-600">
-                              📄 From document
-                            </span>
-                          )}
-                          {response.source === "default" && (
-                            <span className="text-gray-600">
-                              💬 General response
-                            </span>
-                          )}
-                        </div>
-                      )}
-
-                      {response.confidence && (
-                        <div className="text-xs opacity-75">
-                          Confidence: {Math.round(response.confidence * 100)}%
-                        </div>
-                      )}
-
-                      {response.isFallback && (
-                        <div className="text-xs opacity-75 italic">
-                          Fallback response
-                        </div>
-                      )}
-
-                      {response.sources && response.sources.length > 0 && (
-                        <div className="space-y-1">
-                          <div className="text-xs font-medium opacity-75">
-                            Sources ({response.sources.length}):
-                          </div>
-                          {response.sources
-                            .slice(0, 3)
-                            .map((source, sourceIndex) => (
-                              <div
-                                key={sourceIndex}
-                                className="text-xs opacity-75 bg-white bg-opacity-20 rounded px-2 py-1"
-                              >
-                                <div className="font-medium">
-                                  Source {sourceIndex + 1}
-                                  {source.similarity && (
-                                    <span className="ml-1 text-green-600">
-                                      ({Math.round(source.similarity * 100)}%
-                                      match)
-                                    </span>
-                                  )}
-                                </div>
-                                <div className="mt-1">
-                                  {source.text.substring(0, 150)}...
-                                </div>
-                                {source.documentId && (
-                                  <div className="mt-1 text-xs opacity-60">
-                                    Document ID:{" "}
-                                    {source.documentId
-                                      .toString()
-                                      .substring(0, 8)}
-                                    ...
-                                  </div>
-                                )}
-                              </div>
-                            ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  <button
-                    onClick={() => copyToClipboard(response.content, index)}
-                    className="mt-1 text-xs opacity-75 hover:opacity-100 transition-opacity"
-                  >
-                    {copiedIndex === index ? (
-                      <Check className="h-3 w-3" />
-                    ) : (
-                      <Copy className="h-3 w-3" />
-                    )}
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))
-        )}
-
-        {testing && (
-          <div className="flex justify-start">
-            <div className="flex max-w-xs lg:max-w-md">
-              <div className="flex-shrink-0 mr-2">
-                <div className="h-8 w-8 rounded-full bg-gray-600 flex items-center justify-center">
-                  <Bot className="h-4 w-4 text-white" />
-                </div>
-              </div>
-              <div className="rounded-lg px-4 py-2 bg-gray-100 text-gray-900">
-                <div className="flex items-center space-x-1">
-                  <LoadingSpinner size="sm" />
-                  <span className="text-sm">Thinking...</span>
-                </div>
-              </div>
-            </div>
+          <div>
+            <h3 className="text-sm font-semibold text-gray-900">Chat Test</h3>
+            <p className="text-xs text-gray-500">Test your chatbot responses</p>
           </div>
+        </div>
+        {responses.length > 0 && (
+          <button
+            onClick={clearChat}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all duration-200"
+          >
+            <Trash2 className="w-4 h-4" />
+            Clear
+          </button>
         )}
       </div>
 
-      {/* Chat Input */}
-      <form onSubmit={handleSubmit} className="flex space-x-2">
+      <div
+        ref={messagesContainerRef}
+        className="flex-1 overflow-y-auto p-4 space-y-4 scroll-smooth"
+      >
+        {responses.length === 0 && !testing ? (
+          <div className="flex flex-col items-center justify-center h-full min-h-[280px] text-center animate-fade-in">
+            <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-primary-100 to-primary-50 mb-4">
+              <Sparkles className="w-8 h-8 text-primary-600" />
+            </div>
+            <h3 className="text-base font-semibold text-gray-900 mb-1">
+              Test your chatbot
+            </h3>
+            <p className="text-sm text-gray-500 mb-6 max-w-xs">
+              Ask a question to see how your chatbot responds in real-time
+            </p>
+            <div className="flex flex-wrap justify-center gap-2">
+              {EXAMPLE_PROMPTS.map((prompt, i) => (
+                <button
+                  key={i}
+                  onClick={() => handleExampleClick(prompt)}
+                  className="px-3 py-2 text-sm text-gray-700 bg-gray-100 hover:bg-primary-50 hover:text-primary-700 hover:border-primary-200 border border-transparent rounded-lg transition-all duration-200"
+                >
+                  {prompt}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <>
+            {responses.map((response, index) => (
+              <div
+                key={index}
+                className={`flex gap-3 animate-slide-up ${
+                  response.type === "user" ? "flex-row-reverse" : ""
+                }`}
+              >
+                <div
+                  className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
+                    response.type === "user"
+                      ? "bg-primary-600"
+                      : response.isError
+                        ? "bg-red-100"
+                        : "bg-gray-200"
+                  }`}
+                >
+                  {response.type === "user" ? (
+                    <User className="w-4 h-4 text-white" />
+                  ) : (
+                    <Bot
+                      className={`w-4 h-4 ${
+                        response.isError ? "text-red-600" : "text-gray-600"
+                      }`}
+                    />
+                  )}
+                </div>
+                <div
+                  className={`flex flex-col max-w-[85%] ${
+                    response.type === "user" ? "items-end" : "items-start"
+                  }`}
+                >
+                  <div
+                    className={`group relative rounded-2xl px-4 py-2.5 transition-all duration-200 ${
+                      response.type === "user"
+                        ? "bg-primary-600 text-white rounded-br-md"
+                        : response.isError
+                          ? "bg-red-50 text-red-800 rounded-bl-md"
+                          : "bg-gray-100 text-gray-900 rounded-bl-md"
+                    }`}
+                  >
+                    <p className="text-sm leading-relaxed pr-8">
+                      {response.content}
+                    </p>
+                    <button
+                      onClick={() => copyToClipboard(response.content, index)}
+                      className="absolute top-2 right-2 p-1.5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/10"
+                    >
+                      {copiedIndex === index ? (
+                        <Check className="w-3.5 h-3.5" />
+                      ) : (
+                        <Copy className="w-3.5 h-3.5" />
+                      )}
+                    </button>
+                  </div>
+                  {response.type === "bot" && !response.isError && (
+                    <div className="flex flex-wrap items-center gap-2 mt-1.5">
+                      {(response.confidence != null ||
+                        response.source ||
+                        response.isFallback) && (
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {response.confidence != null && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-gray-200/80 text-gray-700">
+                              {Math.round(response.confidence * 100)}% confidence
+                            </span>
+                          )}
+                          {response.source && (
+                            <span
+                              className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium ${
+                                response.source === "pdf"
+                                  ? "bg-emerald-100 text-emerald-800"
+                                  : "bg-gray-200/80 text-gray-700"
+                              }`}
+                            >
+                              {response.source === "pdf" ? "PDF" : "Default"}
+                            </span>
+                          )}
+                          {response.isFallback && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-amber-100 text-amber-800">
+                              Fallback
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  <span className="text-xs text-gray-400 mt-1">
+                    {formatRelativeTime(response.timestamp)}
+                  </span>
+                </div>
+              </div>
+            ))}
+
+            {testing && (
+              <div className="flex gap-3 animate-slide-up">
+                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center">
+                  <Bot className="w-4 h-4 text-gray-600" />
+                </div>
+                <div className="rounded-2xl rounded-bl-md bg-gray-100 px-4 py-2.5">
+                  <TypingIndicator />
+                </div>
+              </div>
+            )}
+            <div ref={messagesEndRef} />
+          </>
+        )}
+      </div>
+
+      <form
+        onSubmit={handleSubmit}
+        className="flex gap-2 p-4 border-t border-gray-200 bg-gray-50"
+      >
         <input
           type="text"
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           placeholder="Type your message..."
-          className="flex-1 input"
           disabled={testing}
+          className="flex-1 px-4 py-2.5 text-sm bg-white border border-gray-200 rounded-xl placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed"
         />
         <button
           type="submit"
           disabled={!message.trim() || testing}
-          className="btn-primary"
+          className="flex items-center justify-center w-10 h-10 rounded-xl bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-primary-600 transition-all duration-200 shrink-0"
         >
           {testing ? (
-            <LoadingSpinner size="sm" />
+            <Loader2 className="w-5 h-5 animate-spin" />
           ) : (
-            <Send className="h-4 w-4" />
+            <Send className="w-5 h-5" />
           )}
         </button>
       </form>
-
-      {/* Clear Chat Button */}
-      {responses.length > 0 && (
-        <div className="mt-2 flex justify-end">
-          <button
-            onClick={clearChat}
-            className="text-sm text-gray-500 hover:text-gray-700"
-          >
-            Clear chat
-          </button>
-        </div>
-      )}
     </div>
   );
 };
