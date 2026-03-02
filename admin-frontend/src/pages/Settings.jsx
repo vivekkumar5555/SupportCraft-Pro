@@ -91,7 +91,7 @@ const Settings = () => {
   };
 
   const copyWidgetCode = async () => {
-    const widgetCode = `<script src="https://your-domain.com/widget/loader.js" data-widget-key="${tenant.widgetKey}"></script>`;
+    const widgetCode = `<script src="https://supportcraft-pro-support-widget-backend.onrender.com/widget/loader.js" data-widget-key="${tenant.widgetKey}"></script>`;
 
     try {
       await navigator.clipboard.writeText(widgetCode);
@@ -460,7 +460,7 @@ const Settings = () => {
                 <label className="label">Embed Code</label>
                 <div className="space-y-3">
                   <textarea
-                    value={`<script src="https://your-domain.com/widget/loader.js" data-widget-key="${tenant.widgetKey}"></script>`}
+                    value={`<script src="https://supportcraft-pro-support-widget-backend.onrender.com/widget/loader.js" data-widget-key="${tenant.widgetKey}"></script>`}
                     readOnly
                     className="input font-mono text-sm"
                     rows={3}
