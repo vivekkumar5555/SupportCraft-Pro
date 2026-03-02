@@ -5,7 +5,7 @@ services:
     runtime: node
     region: oregon
     plan: free
-    buildCommand: cd widget && npm install && npm run build && cd ../backend && npm install
+    buildCommand: cd widget && npm install && npm run build && cd ../backend && mkdir -p widget-assets/build && cp ../widget/loader.js widget-assets/ && cp ../widget/build/widget.js widget-assets/build/ && npm install
     startCommand: cd backend && node src/server.js
     envVars:
       - key: NODE_ENV

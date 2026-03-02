@@ -10,7 +10,10 @@ import helmet from "helmet";
 import mongoose from "mongoose";
 import fs from "fs/promises";
 import path from "path";
+import { fileURLToPath } from "url";
 import net from "net";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Import routes
 import authRoutes from "./routes/authRoutes.js";
@@ -54,20 +57,30 @@ const io = new Server(server, {
   },
 });
 
-// Serve widget files (loader.js + built widget.js) from the backend
-// so we don't depend on a separate static-site service.
-const widgetDir = path.resolve(process.cwd(), "../widget");
+// Serve widget files from backend/widget-assets (copied there during Render build).
+// This works even when Render's Root Directory is "backend" (no sibling ../widget).
+// Production (Render): widget files copied to backend/widget-assets during build.
+// Local dev: use sibling ../widget if widget-assets not present.
+const widgetAssetsDir = path.join(__dirname, "..", "widget-assets");
+const widgetDirFallback = path.resolve(process.cwd(), "..", "widget");
+let widgetDirResolved;
+try {
+  await fs.access(path.join(widgetAssetsDir, "loader.js"));
+  widgetDirResolved = widgetAssetsDir;
+} catch {
+  widgetDirResolved = widgetDirFallback;
+}
 app.get("/widget/loader.js", (req, res) => {
   res.set({
     "Access-Control-Allow-Origin": "*",
     "Content-Type": "application/javascript",
     "Cache-Control": "no-cache, no-store, must-revalidate",
   });
-  res.sendFile(path.join(widgetDir, "loader.js"));
+  res.sendFile(path.join(widgetDirResolved, "loader.js"));
 });
 app.use(
   "/widget/build",
-  express.static(path.join(widgetDir, "build"), {
+  express.static(path.join(widgetDirResolved, "build"), {
     setHeaders(res) {
       res.set("Access-Control-Allow-Origin", "*");
       res.set("Cache-Control", "no-cache, no-store, must-revalidate");
