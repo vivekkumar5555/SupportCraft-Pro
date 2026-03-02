@@ -81,26 +81,20 @@ app.use(helmet());
 // Clean up FRONTEND_URL (remove trailing slash if present)
 const frontendUrl = process.env.FRONTEND_URL?.replace(/\/$/, '');
 
-// Widget chat routes need open CORS (embedded on any customer website)
-app.use("/api/chat", cors({ origin: true }));
+// Route-specific CORS — no catch-all so they don't overwrite each other
+const adminCors = cors({ origin: frontendUrl, credentials: true });
+const widgetCors = cors({ origin: true });
 
-// Admin routes use restrictive CORS (only the admin dashboard)
-app.use(
-  cors({
-    origin: frontendUrl,
-    credentials: true,
-  })
-);
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
 // Rate limiting
 app.use("/api/chat", rateLimiter);
 
-// Routes
-app.use("/api/auth", authRoutes);
-app.use("/api/admin", authenticateToken, adminRoutes);
-app.use("/api/chat", chatRoutes);
+// Routes — each with its own CORS policy
+app.use("/api/auth", adminCors, authRoutes);
+app.use("/api/admin", adminCors, authenticateToken, adminRoutes);
+app.use("/api/chat", widgetCors, chatRoutes);
 
 // Health check
 app.get("/health", (req, res) => {
