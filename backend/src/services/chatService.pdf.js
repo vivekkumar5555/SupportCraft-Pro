@@ -101,40 +101,94 @@ export const generateChatResponse = async (
 };
 
 /**
- * From a chunk of text, find the paragraph most relevant to the keywords.
+ * From a chunk of text, find the Q&A item or paragraph most relevant
+ * to the keywords, then return only the ANSWER portion.
  */
 function extractBestParagraph(text, keywords) {
-  // Split into individual Q&A items or paragraphs
-  // Try numbered items first (1. xxx  2. xxx)
-  const numberedItems = text.split(/(?=\d+\.\s)/).filter((s) => s.trim().length > 15);
-  const paragraphs = numberedItems.length > 1
-    ? numberedItems
+  // Parse into Q&A items: split on numbered patterns like "1. " or "Q1:"
+  const qaItems = text.split(/(?=(?:^|\n)\s*(?:\d+[\.\)]\s|Q\d+[\:\.\s]))/m)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 15);
+
+  const items = qaItems.length > 1
+    ? qaItems
     : text.split(/\n\s*\n/).filter((s) => s.trim().length > 15);
 
-  if (paragraphs.length <= 1) {
-    return cleanAnswer(text);
+  if (items.length <= 1) {
+    return extractAnswerOnly(cleanAnswer(text));
   }
 
-  // Score paragraphs
-  let bestPara = paragraphs[0];
+  // Score each item
+  let bestItem = items[0];
   let bestScore = -1;
 
-  for (const para of paragraphs) {
-    const paraLower = para.toLowerCase();
+  for (const item of items) {
+    const itemLower = item.toLowerCase();
     let score = 0;
     for (const kw of keywords) {
       const re = new RegExp(`\\b${escapeRegex(kw)}\\b`, "gi");
-      const m = paraLower.match(re);
+      const m = itemLower.match(re);
       if (m) score += m.length * 5;
-      else if (paraLower.includes(kw)) score += 2;
+      else if (itemLower.includes(kw)) score += 2;
     }
     if (score > bestScore) {
       bestScore = score;
-      bestPara = para;
+      bestItem = item;
     }
   }
 
-  return cleanAnswer(bestPara);
+  return extractAnswerOnly(cleanAnswer(bestItem));
+}
+
+/**
+ * Given a Q&A block, strip the question and return only the answer.
+ * Handles formats like:
+ *   "1. What is X?\nThe answer is..."
+ *   "Q1: What is X?\nA1: The answer is..."
+ *   "What is X? The answer is..."
+ */
+function extractAnswerOnly(text) {
+  const lines = text.split(/\n/).map((l) => l.trim()).filter((l) => l.length > 0);
+  if (lines.length <= 1) {
+    // Single line — try to split on "?" and return the part after it
+    const qMark = text.indexOf("?");
+    if (qMark !== -1 && qMark < text.length - 5) {
+      const afterQ = text.substring(qMark + 1).trim();
+      // Strip leading "A1:" or "Answer:" from the answer part
+      return afterQ.replace(/^(A\d+[\:\.\s]*|Answer\s*:\s*)/i, "").trim();
+    }
+    return text;
+  }
+
+  // Multi-line: find where the answer starts
+  let answerStartIdx = 0;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    // Skip lines that look like questions or headers
+    if (
+      /^\d+[\.\)]\s*.+\?/.test(line) ||
+      /^Q\d+[\:\.\s]/i.test(line) ||
+      /^Question\s*:/i.test(line) ||
+      /^(Computer Specification|Frequently Asked|FAQ)/i.test(line) ||
+      line.endsWith("?")
+    ) {
+      answerStartIdx = i + 1;
+      continue;
+    }
+    // Skip "A1:" prefix on the answer line itself
+    if (/^(A\d+[\:\.\s]|Answer\s*:\s*)/i.test(line)) {
+      answerStartIdx = i;
+      break;
+    }
+    break;
+  }
+
+  const answerLines = lines.slice(answerStartIdx);
+  if (answerLines.length === 0) return text;
+
+  let answer = answerLines.join(" ");
+  answer = answer.replace(/^(A\d+[\:\.\s]*|Answer\s*:\s*)/i, "").trim();
+  return answer || text;
 }
 
 function cleanAnswer(text) {
